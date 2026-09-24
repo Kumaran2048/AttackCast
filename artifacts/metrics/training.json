@@ -1,0 +1,6 @@
+{
+  "train_samples": 1976,
+  "validation_samples": 494,
+  "seed": 42,
+  "model": "GRU-attention"
+}

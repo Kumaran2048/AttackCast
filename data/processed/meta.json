@@ -1,0 +1,44 @@
+{
+  "feature_cols": [
+    "Destination Port",
+    "Flow Duration",
+    "Flow Bytes/s",
+    "Flow Packets/s",
+    "Fwd Packet Length Mean",
+    "Bwd Packet Length Mean",
+    "Flow IAT Mean",
+    "Fwd Packets/s",
+    "Bwd Packets/s",
+    "Packet Length Std",
+    "FIN Flag Count",
+    "PSH Flag Count",
+    "ACK Flag Count",
+    "Init_Win_bytes_forward",
+    "Active Mean",
+    "Idle Mean"
+  ],
+  "state_names": [
+    "Benign / Normal",
+    "Reconnaissance",
+    "Initial Access / Credential Access",
+    "Execution / Foothold",
+    "Command and Control",
+    "Lateral Movement",
+    "Exfiltration",
+    "Impact"
+  ],
+  "label_map": {
+    "Normal Traffic": 0,
+    "Port Scanning": 1,
+    "Brute Force": 2,
+    "Web Attacks": 3,
+    "Bots": 4,
+    "DoS": 5,
+    "DDoS": 7
+  },
+  "n_states": 8,
+  "seq_len": 20,
+  "dataset": "CICIDS-2017 (cleaned, Kaggle: ericanacletoribeiro)",
+  "total_flows": 2520751,
+  "total_seqs": 252074
+}
