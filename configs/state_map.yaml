@@ -1,0 +1,39 @@
+states:
+  - {id: 0, name: "Benign / Normal", tactic: "-", attack_id: null}
+  - {id: 1, name: "Reconnaissance", tactic: "TA0043", attack_id: "T1046"}
+  - {id: 2, name: "Initial Access / Credential Access", tactic: "TA0001, TA0006", attack_id: "T1110"}
+  - {id: 3, name: "Execution / Foothold", tactic: "TA0002", attack_id: null}
+  - {id: 4, name: "Command and Control", tactic: "TA0011", attack_id: "T1071"}
+  - {id: 5, name: "Lateral Movement", tactic: "TA0008", attack_id: "T1021"}
+  - {id: 6, name: "Exfiltration", tactic: "TA0010", attack_id: "T1041/T1048"}
+  - {id: 7, name: "Impact", tactic: "TA0040", attack_id: "T1498/T1499"}
+transition_prior:
+  0: [0.70,0.20,0.05,0.02,0.01,0.01,0.005,0.005]
+  1: [0.05,0.55,0.30,0.05,0.02,0.02,0.005,0.005]
+  2: [0.02,0.05,0.45,0.30,0.10,0.05,0.01,0.02]
+  3: [0.01,0.02,0.08,0.45,0.30,0.08,0.04,0.02]
+  4: [0.01,0.01,0.02,0.05,0.65,0.15,0.08,0.03]
+  5: [0.01,0.01,0.01,0.03,0.12,0.58,0.18,0.06]
+  6: [0.01,0.01,0.01,0.02,0.08,0.05,0.68,0.14]
+  7: [0.15,0.02,0.01,0.01,0.01,0.01,0.01,0.78]
+mapping_rules:
+  - source_label: "FTP-BruteForce"
+    state_id: 2
+    confidence: high
+    rationale: "credential access"
+  - source_label: "SSH-Bruteforce"
+    state_id: 2
+    confidence: high
+    rationale: "credential access"
+  - source_label: "Infiltration"
+    state_id: 3
+    confidence: high
+    rationale: "foothold/payload activity"
+  - source_label: "Bot"
+    state_id: 4
+    confidence: high
+    rationale: "command and control"
+  - source_label: "Benign"
+    state_id: 0
+    confidence: high
+    rationale: "benign traffic"

@@ -1,0 +1,5 @@
+templates:
+  unique_dst_ports: "The host contacted {value} distinct destination ports; this increases the reconnaissance signal."
+  syn_ratio: "A high SYN-only ratio ({value}) suggests connection probing or incomplete connection attempts."
+  flow_rate: "The flow rate reached {value} flows/s, which is elevated for the observed window."
+  bytes_out: "Outbound bytes were {value}, contributing to the predicted stage."

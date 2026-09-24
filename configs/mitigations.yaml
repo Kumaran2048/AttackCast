@@ -1,0 +1,14 @@
+Reconnaissance:
+  - {action: "Filter/rate-limit suspicious scans", mitigation_id: "M1037", rationale: "Reduce network discovery exposure."}
+Initial Access / Credential Access:
+  - {action: "Enforce MFA and account-use policies", mitigation_id: "M1032", rationale: "Reduce credential abuse."}
+Execution / Foothold:
+  - {action: "Review endpoint execution controls", mitigation_id: "advisory", rationale: "Contain suspicious execution."}
+Command and Control:
+  - {action: "Review outbound C2 destinations and filtering", mitigation_id: "advisory", rationale: "Limit C2 communications."}
+Lateral Movement:
+  - {action: "Review network segmentation", mitigation_id: "M1030", rationale: "Limit host-to-host movement."}
+Exfiltration:
+  - {action: "Review egress filtering and DLP controls", mitigation_id: "advisory", rationale: "Limit unauthorized transfer."}
+Impact:
+  - {action: "Review intrusion prevention and rate limiting", mitigation_id: "M1031", rationale: "Reduce impact traffic."}

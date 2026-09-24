@@ -1,0 +1,43 @@
+/* @import url() FONT IMPORTS MUST ALWAYS BE AT THE VERY TOP OF THIS FILE, ABOVE THE TAILWIND IMPORTS — DO NOT DELETE THIS COMMENT */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+
+/* CRITICAL: THE FOLLOWING TAILWIND IMPORTS MUST NEVER BE DELETED OR REORDERED — DO NOT DELETE THIS COMMENT */
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+
+/* END TAILWIND IMPORTS — ALL OTHER CSS MUST GO BELOW THIS LINE */
+
+:root {
+  --bg: 10 13 18;
+  --surface: 17 22 29;
+  --raised: 24 30 39;
+  --line: 36 44 56;
+  --fg: 230 237 243;
+  --muted: 146 158 173;
+  --subtle: 96 108 124;
+  --accent: 76 194 255;
+  --watch: 222 186 80;
+  --warn: 240 140 58;
+  --crit: 240 82 79;
+  --ok: 63 182 139;
+}
+html,
+body,
+#root {
+  min-height: 100%;
+  background: rgb(var(--bg));
+  color: rgb(var(--fg));
+}
+body {
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+  }
+}

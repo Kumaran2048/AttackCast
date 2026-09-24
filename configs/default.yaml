@@ -1,0 +1,15 @@
+seed: 42
+window_seconds: 30
+sequence_length: 10
+forecast_k: 5
+rollouts: 200
+confidence_threshold: 0.55
+uncertainty_entropy: 1.75
+data:
+  source: synthetic
+  synthetic_rows: 4000
+model:
+  hidden: 64
+  epochs: 8
+  batch_size: 64
+  lr: 0.001
