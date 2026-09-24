@@ -330,10 +330,58 @@ def create_pdf():
     story.append(Spacer(1, 12))
 
     # ── DEPLOYMENT LINKS & SUMMARY ────────────────────────────────────────────
-    story.append(Paragraph("7. Access & Deployment Links", h1_style))
-    story.append(Paragraph("• <b>Live Vercel Frontend</b>: <font color='#0284C7'><u>https://attack-cast-neon.vercel.app/</u></font>", bullet_style))
-    story.append(Paragraph("• <b>GitHub Repository</b>: <font color='#0284C7'><u>https://github.com/Kumaran2048/AttackCast</u></font>", bullet_style))
-    story.append(Paragraph("• <b>Local Host Server</b>: <code>http://localhost:8000</code> (FastAPI + Swagger Docs at <code>/docs</code>)", bullet_style))
+    story.append(Paragraph("7. Live Production Deployments & Access URLs", h1_style))
+    story.append(Paragraph("All services, cloud models, and interfaces are deployed and live on the public web:", body_style))
+
+    links_data = [
+        [
+            Paragraph("<b>Component / Service</b>", table_header_style),
+            Paragraph("<b>Live URL</b>", table_header_style),
+            Paragraph("<b>Environment / Host</b>", table_header_style),
+        ],
+        [
+            Paragraph("<b>Frontend Web Cockpit</b>", table_cell_style),
+            Paragraph("<font color='#0284C7'><u>https://attack-cast-neon.vercel.app/</u></font>", table_cell_style),
+            Paragraph("Vercel (Global Edge Network)", table_cell_style),
+        ],
+        [
+            Paragraph("<b>Cloud Backend API</b>", table_cell_style),
+            Paragraph("<font color='#0284C7'><u>https://attackcast.onrender.com/</u></font>", table_cell_style),
+            Paragraph("Render Cloud (FastAPI + PyTorch)", table_cell_style),
+        ],
+        [
+            Paragraph("<b>Interactive Swagger Docs</b>", table_cell_style),
+            Paragraph("<font color='#0284C7'><u>https://attackcast.onrender.com/docs</u></font>", table_cell_style),
+            Paragraph("OpenAPI Interactive Playground", table_cell_style),
+        ],
+        [
+            Paragraph("<b>Live API Health & Dataset Check</b>", table_cell_style),
+            Paragraph("<font color='#0284C7'><u>https://attackcast.onrender.com/api/health</u></font>", table_cell_style),
+            Paragraph("Returns 2.52M flow dataset status", table_cell_style),
+        ],
+        [
+            Paragraph("<b>Live Model Metrics & Transition Matrix</b>", table_cell_style),
+            Paragraph("<font color='#0284C7'><u>https://attackcast.onrender.com/api/metrics</u></font>", table_cell_style),
+            Paragraph("Returns F1 & transition matrix", table_cell_style),
+        ],
+        [
+            Paragraph("<b>GitHub Source Repository</b>", table_cell_style),
+            Paragraph("<font color='#0284C7'><u>https://github.com/Kumaran2048/AttackCast</u></font>", table_cell_style),
+            Paragraph("GitHub (Full codebase + weights)", table_cell_style),
+        ],
+    ]
+
+    t_links = Table(links_data, colWidths=[2.2*inch, 3.2*inch, 1.6*inch])
+    t_links.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), c_primary),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('GRID', (0, 0), (-1, -1), 0.5, c_line),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [c_card_bg, colors.white]),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+    ]))
+    story.append(t_links)
 
     doc.build(story)
     print(f"[OK] Generated {PDF_PATH} successfully!")
