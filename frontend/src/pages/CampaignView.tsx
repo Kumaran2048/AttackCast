@@ -14,29 +14,28 @@ import { LEVEL_META } from '../components/LevelBadge';
 export function CampaignView() {
   const { state, dispatch, scenario, current } = useReplayContext();
   const campaign = current?.campaign ?? null;
-  const graph = useMemo(() => current ? buildHostGraph(scenario, current) : { nodes: [], edges: [] }, [scenario, current]);
-  const riskHistory = useMemo(() => state.updates.map((u) => u.campaign?.risk_score ?? 0), [state.updates]);
+  const graph = useMemo(() => (current ? buildHostGraph(scenario, current) : { nodes: [], edges: [] }), [scenario, current]);
+  const riskHistory = useMemo(() => state.updates.map((u) => u.campaign?.risk_score ?? u.hosts[0]?.alert.adjusted_score ?? 0), [state.updates]);
 
-  if (!scenario.is_multi_host || !campaign || !current) {
+  const host = current?.hosts[0];
+  const isMulti = scenario.is_multi_host && campaign;
+  const riskScore = isMulti ? campaign.risk_score : host?.alert.adjusted_score ?? 0.05;
+  const level = levelFor(riskScore);
+  const m = LEVEL_META[level];
+  const soloAlerts = isMulti
+    ? campaign.member_scores.filter((s) => s.solo >= ALERT_THRESHOLDS.watch).length
+    : host && host.alert.base_score >= ALERT_THRESHOLDS.watch
+    ? 1
+    : 0;
+
+  if (!current) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center rounded-lg border border-dashed border-line bg-surface p-8 text-center">
         <NetworkIcon className="h-8 w-8 text-subtle" aria-hidden />
-        <h2 className="mt-3 text-base font-medium text-fg">No multi-host scenario loaded</h2>
-        <p className="mt-1 max-w-sm text-sm text-muted">Cross-host correlation needs a scenario with several hosts. Load the coordinated campaign to see it.</p>
-        <button
-          type="button"
-          onClick={() => dispatch({ type: 'scenario', id: 'coordinated' })}
-          className="mt-5 rounded-md bg-accent px-4 py-2 text-sm font-medium text-bg transition-opacity duration-150 hover:opacity-90">
-          
-          Load coordinated campaign
-        </button>
-      </div>);
-
+        <h2 className="mt-3 text-base font-medium text-fg">Initializing Replay Stream...</h2>
+      </div>
+    );
   }
-
-  const level = levelFor(campaign.risk_score);
-  const m = LEVEL_META[level];
-  const soloAlerts = campaign.member_scores.filter((s) => s.solo >= ALERT_THRESHOLDS.watch).length;
 
   return (
     <div className="space-y-5">
@@ -59,69 +58,90 @@ export function CampaignView() {
           <section className={`rounded-lg border p-5 ${m.fill}`} aria-live="polite">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs text-muted">Campaign risk</p>
-                <p className={`mt-1 font-mono text-4xl font-medium ${m.text}`}>{pct(campaign.risk_score)}</p>
+                <p className="text-xs text-muted">{isMulti ? 'Campaign risk' : 'Host risk score'}</p>
+                <p className={`mt-1 font-mono text-4xl font-medium ${m.text}`}>{pct(riskScore)}</p>
                 <p className={`mt-1 flex items-center gap-1.5 text-sm ${m.text}`}>
-                  <m.Icon className="h-4 w-4" aria-hidden /> {level === 'none' ? 'No campaign' : `${m.label} · coordinated campaign`}
+                  <m.Icon className="h-4 w-4" aria-hidden /> {level === 'none' ? 'Normal Baseline' : `${m.label} · ${isMulti ? 'coordinated campaign' : host?.current_state.name}`}
                 </p>
               </div>
               <div className="text-right">
-                <p className="font-mono text-4xl font-medium text-fg">{soloAlerts}<span className="text-subtle">/{campaign.member_hosts.length}</span></p>
-                <p className="text-xs text-muted">hosts alerting alone</p>
+                <p className="font-mono text-4xl font-medium text-fg">
+                  {soloAlerts}
+                  <span className="text-subtle">/{isMulti ? campaign.member_hosts.length : 1}</span>
+                </p>
+                <p className="text-xs text-muted">{isMulti ? 'hosts alerting alone' : 'monitored host'}</p>
               </div>
             </div>
-            <p className="mt-4 text-sm leading-relaxed text-fg">{campaign.explanation.text}</p>
+            <p className="mt-4 text-sm leading-relaxed text-fg">
+              {isMulti
+                ? campaign.explanation.text
+                : host?.explanation.text ?? 'Monitoring single host interaction and topology flows.'}
+            </p>
             <div className="mt-4">
-              <Sparkline series={[{ values: riskHistory, className: 'stroke-crit', label: 'campaign risk over time' }]} />
-              <p className="text-[11px] text-subtle">Campaign risk per window</p>
+              <Sparkline series={[{ values: riskHistory, className: 'stroke-crit', label: 'risk over time' }]} />
+              <p className="text-[11px] text-subtle">Risk trajectory per window</p>
             </div>
           </section>
 
-          <Panel title={`P(campaign confirmed) · next ${campaign.forecast.horizons.length} windows`}>
+          <Panel title={`P(${isMulti ? 'campaign confirmed' : 'impact reach'}) · next ${isMulti ? campaign.forecast.horizons.length : host?.forecast.horizons.length ?? 5} windows`}>
             <div className="flex items-end gap-2">
-              {campaign.forecast.horizons.map((h) =>
-              <div key={h.k} className="flex flex-1 flex-col items-center gap-1">
-                  <span className="font-mono text-[11px] text-fg">{Math.round(h.reach_prob_confirmed * 100)}</span>
-                  <div className="flex h-20 w-full items-end rounded-sm bg-raised">
-                    <div className="w-full rounded-sm bg-crit/80" style={{ height: `${h.reach_prob_confirmed * 100}%` }} />
+              {(isMulti ? campaign.forecast.horizons : host?.forecast.horizons ?? []).map((h: any) => {
+                const prob = isMulti ? h.reach_prob_confirmed : h.reach_probs ? h.reach_probs[7] ?? 0.2 : 0.1;
+                return (
+                  <div key={h.k} className="flex flex-1 flex-col items-center gap-1">
+                    <span className="font-mono text-[11px] text-fg">{Math.round(prob * 100)}</span>
+                    <div className="flex h-20 w-full items-end rounded-sm bg-raised">
+                      <div className="w-full rounded-sm bg-crit/80" style={{ height: `${Math.min(100, Math.round(prob * 100))}%` }} />
+                    </div>
+                    <span className="font-mono text-[10px] text-subtle">k={h.k}</span>
                   </div>
-                  <span className="font-mono text-[10px] text-subtle">k={h.k}</span>
-                </div>
-              )}
+                );
+              })}
             </div>
           </Panel>
         </div>
       </div>
 
-      <Panel title="Individually low, collectively flagged" aside={<Tag tone="synthetic">{scenario.sequence_origin}</Tag>}>
+      <Panel
+        title={isMulti ? 'Individually low, collectively flagged' : 'Host Network Flow & Correlation'}
+        aside={<Tag tone="synthetic">{scenario.sequence_origin}</Tag>}
+      >
         <div className="overflow-x-auto">
           <table className="w-full min-w-[560px] text-left text-sm">
             <thead className="text-xs text-subtle">
               <tr>
                 <th className="pb-2 font-normal">Host</th>
-                <th className="pb-2 font-normal">Solo score (no graph)</th>
-                <th className="pb-2 font-normal">Correlated score (with graph)</th>
-                <th className="pb-2 text-right font-normal">Contribution</th>
+                <th className="pb-2 font-normal">{isMulti ? 'Solo score (no graph)' : 'Current State'}</th>
+                <th className="pb-2 font-normal">{isMulti ? 'Correlated score (with graph)' : 'Risk Level'}</th>
+                <th className="pb-2 text-right font-normal">{isMulti ? 'Contribution' : 'Top Feature'}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
-              {campaign.member_scores.map((s) => {
-                const w = campaign.explanation.top_contributing_hosts.find((h) => h.entity === s.entity)?.weight ?? 0;
-                return (
-                  <tr key={s.entity}>
-                    <td className="py-2.5 font-mono text-xs text-fg">{s.entity}</td>
-                    <td className="py-2.5"><ScoreBar value={s.solo} /></td>
-                    <td className="py-2.5"><ScoreBar value={s.correlated} /></td>
-                    <td className="py-2.5 text-right font-mono text-xs text-muted">{pct(w)}</td>
-                  </tr>);
-
-              })}
+              {isMulti ? (
+                campaign.member_scores.map((s) => {
+                  const w = campaign.explanation.top_contributing_hosts.find((h) => h.entity === s.entity)?.weight ?? 0;
+                  return (
+                    <tr key={s.entity}>
+                      <td className="py-2.5 font-mono text-xs text-fg">{s.entity}</td>
+                      <td className="py-2.5"><ScoreBar value={s.solo} /></td>
+                      <td className="py-2.5"><ScoreBar value={s.correlated} /></td>
+                      <td className="py-2.5 text-right font-mono text-xs text-muted">{pct(w)}</td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td className="py-2.5 font-mono text-xs text-fg">{host?.entity}</td>
+                  <td className="py-2.5 text-xs text-fg">{host?.current_state.name}</td>
+                  <td className="py-2.5"><ScoreBar value={host?.alert.adjusted_score ?? 0} /></td>
+                  <td className="py-2.5 text-right font-mono text-xs text-muted">
+                    {host?.explanation.top_features[0]?.feature ?? 'flow_rate'}
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
-        <p className="mt-3 text-[11px] text-subtle">
-          Correlated scores come from the mock stream. The real graph-layer lift gets measured in Phase 3 (ablation with vs without the graph layer).
-        </p>
       </Panel>
     </div>);
 

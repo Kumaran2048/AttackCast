@@ -3,34 +3,56 @@ import type { GraphEdge, GraphNode, WindowUpdate } from '../types/attackcast';
 import { memberFlows } from './mockStream';
 
 // Fixed layout stands in for the backend's seeded NetworkX spring_layout (Phase 0 decision).
-export function buildHostGraph(sc: Scenario, update: WindowUpdate): {nodes: GraphNode[];edges: GraphEdge[];} {
+export function buildHostGraph(sc: Scenario, update: WindowUpdate): { nodes: GraphNode[]; edges: GraphEdge[] } {
   const c = sc.campaign;
-  if (!c || !update.campaign) return { nodes: [], edges: [] };
   const w = update.window_id;
-  const active = w >= c.startWindow;
-  const scores = update.campaign.member_scores;
-  const step = 300 / (c.members.length - 1);
+
+  if (c && update.campaign) {
+    const active = w >= c.startWindow;
+    const scores = update.campaign.member_scores;
+    const step = 300 / (c.members.length - 1);
+
+    const nodes: GraphNode[] = [
+      ...c.members.map((id, i) => ({
+        id,
+        kind: 'host' as const,
+        x: 140,
+        y: 40 + i * step,
+        risk: scores.find((s) => s.entity === id)?.correlated ?? 0,
+        in_campaign: active,
+      })),
+      { id: c.target.ip, kind: 'target', x: 470, y: 190, risk: update.campaign.risk_score, in_campaign: active },
+      ...c.bystanders.map((id, i) => ({ id, kind: 'host' as const, x: 300, y: i === 0 ? 30 : 350, risk: 0.05, in_campaign: false })),
+      { id: 'external', kind: 'external', x: 520, y: 330, risk: 0.02, in_campaign: false },
+    ];
+
+    const edges: GraphEdge[] = [
+      ...(active
+        ? c.members.map((m) => ({ source: m, target: c.target.ip, flows: memberFlows(sc.id, m, w), port: c.target.port, shared_target: true }))
+        : []),
+      ...c.bystanders.map((b) => ({ source: b, target: 'external', flows: 6, port: 443, shared_target: false })),
+    ];
+
+    return { nodes, edges };
+  }
+
+  // Fallback for single host scenarios (e.g. Infiltration, Botnet, Benign)
+  const host = update.hosts[0];
+  const risk = host?.alert.adjusted_score ?? 0.1;
+  const hostId = host?.entity ?? '172.31.69.25';
 
   const nodes: GraphNode[] = [
-  ...c.members.map((id, i) => ({
-    id,
-    kind: 'host' as const,
-    x: 140,
-    y: 40 + i * step,
-    risk: scores.find((s) => s.entity === id)?.correlated ?? 0,
-    in_campaign: active
-  })),
-  { id: c.target.ip, kind: 'target', x: 470, y: 190, risk: update.campaign.risk_score, in_campaign: active },
-  ...c.bystanders.map((id, i) => ({ id, kind: 'host' as const, x: 300, y: i === 0 ? 30 : 350, risk: 0.05, in_campaign: false })),
-  { id: 'external', kind: 'external', x: 520, y: 330, risk: 0.02, in_campaign: false }];
-
+    { id: hostId, kind: 'host', x: 140, y: 190, risk, in_campaign: true },
+    { id: '10.0.0.1 (Gateway)', kind: 'host', x: 320, y: 120, risk: 0.05, in_campaign: false },
+    { id: '172.16.0.10', kind: 'target', x: 480, y: 120, risk: risk * 0.85, in_campaign: risk > 0.3 },
+    { id: 'external-c2', kind: 'external', x: 480, y: 260, risk: risk > 0.5 ? 0.9 : 0.1, in_campaign: risk > 0.4 },
+  ];
 
   const edges: GraphEdge[] = [
-  ...(active ?
-  c.members.map((m) => ({ source: m, target: c.target.ip, flows: memberFlows(sc.id, m, w), port: c.target.port, shared_target: true })) :
-  []),
-  ...c.bystanders.map((b) => ({ source: b, target: 'external', flows: 6, port: 443, shared_target: false }))];
-
+    { source: hostId, target: '10.0.0.1 (Gateway)', flows: 12, port: 80, shared_target: false },
+    { source: '10.0.0.1 (Gateway)', target: '172.16.0.10', flows: Math.max(1, Math.round(risk * 15)), port: 22, shared_target: risk > 0.3 },
+    { source: hostId, target: 'external-c2', flows: Math.max(0, Math.round(risk * 8)), port: 443, shared_target: risk > 0.5 },
+  ];
 
   return { nodes, edges };
 }
