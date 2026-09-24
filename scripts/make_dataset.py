@@ -1,54 +1,181 @@
-import argparse, os, json
-import numpy as np, pandas as pd
+"""
+Ingest CICIDS-2017 cleaned CSV → map to 8 ATT&CK states → save processed sequences.
+
+ATT&CK State Map:
+  0  Benign / Normal
+  1  Reconnaissance         (Port Scanning)
+  2  Initial Access         (Brute Force, Web Attacks)
+  3  Execution / Foothold   (Web Attacks - exploitation phase)
+  4  Command and Control    (Bots)
+  5  Lateral Movement       (mapped from multi-host DoS patterns)
+  6  Exfiltration           (high upload DoS)
+  7  Impact                 (DDoS)
+"""
+
+import os
+import numpy as np
+import pandas as pd
 from pathlib import Path
-from backend.ml.build.features import make_windows, FEATURES
-from backend.ml.build.states import assign_states
-from backend.ml.build.splits import temporal_split
 
-def synthetic(n=4000,seed=42):
-    rng=np.random.default_rng(seed)
-    stages=np.repeat(np.arange(8),max(1,n//8))[:n]
-    rng.shuffle(stages)
-    ts=pd.date_range("2026-01-01",periods=n,freq="2s")
-    rows=[]
-    for i,s in enumerate(stages):
-        base=1+s*2
-        rows.append({
-          "flow_id":i,"ts_start":ts[i].isoformat(),"duration":float(rng.exponential(1+base/3)),
-          "src_ip":f"10.0.{i%10}.{(i%20)+1}","dst_ip":f"10.1.{i%5}.{(i%50)+1}",
-          "src_port":int(rng.integers(1024,65000)),"dst_port":int(rng.choice([22,53,80,443,445,3389,8080])),
-          "proto":"TCP","fwd_pkts":int(rng.integers(1,10+base)),"bwd_pkts":int(rng.integers(0,8)),
-          "fwd_bytes":int(rng.integers(100,1000+base*500)),"bwd_bytes":int(rng.integers(50,800)),
-          "syn_cnt":int(rng.integers(0,3+base)),"ack_cnt":int(rng.integers(0,3+base)),
-          "rst_cnt":int(rng.integers(0,2)),"fin_cnt":int(rng.integers(0,2)),"psh_cnt":int(rng.integers(0,2)),
-          "tcp_state_or_flags":"","label_raw":["Benign","Scan","SSH-Bruteforce","Infiltration","Bot","Lateral","Exfil","DoS"][s],
-          "source_dataset":"synthetic","scenario_id":"synthetic-development"})
-    return pd.DataFrame(rows)
+RAW_CSV   = Path("data/raw/cic2018/cicids2017_cleaned.csv")
+OUT_DIR   = Path("data/processed")
+OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-if __name__=="__main__":
-    ap=argparse.ArgumentParser()
-    ap.add_argument("--synthetic",action="store_true"); ap.add_argument("--real",action="store_true")
-    ap.add_argument("--rows",type=int,default=4000); ap.add_argument("--seed",type=int,default=42)
-    a=ap.parse_args()
-    if not a.synthetic and not a.real: a.synthetic=True
-    if a.real:
-        raise SystemExit("Real ingestion is intentionally explicit. Put files under data/raw and extend the source loader for the exact dataset copy.")
-    df=synthetic(a.rows,a.seed)
-    Path("data/interim/canonical_flows").mkdir(parents=True,exist_ok=True)
-    df.to_parquet("data/interim/canonical_flows/synthetic.parquet",index=False)
-    w=make_windows(df)
-    # map synthetic labels using direct stage hints
-    mapping={"Benign":0,"Scan":1,"SSH-Bruteforce":2,"Infiltration":3,"Bot":4,"Lateral":5,"Exfil":6,"DoS":7}
-    raw=df["label_raw"].map(mapping).to_numpy()
-    # assign window states by dominant raw stage in its time bin
-    tmp=df.copy(); tmp["state"]=raw
-    ww=make_windows(tmp)
-    # align state by entity/time approximately using nearest grouping
-    w["state"]=np.random.default_rng(a.seed).integers(0,8,len(w))
-    w["state_source"]="synthetic"
-    w.to_parquet("data/processed/windows.parquet",index=False)
-    split=temporal_split(w)
-    Path("data/processed").mkdir(exist_ok=True)
-    json.dump(split,open("data/processed/splits.json","w"),indent=2)
-    json.dump({"source":"synthetic","label":"SYNTHETIC DEVELOPMENT DATA","rows":len(df),"windows":len(w)},open("data/processed/data_manifest.json","w"),indent=2)
-    print(f"created {len(df)} synthetic flows and {len(w)} windows")
+# ── Label → ATT&CK state mapping ─────────────────────────────────────────────
+LABEL_MAP = {
+    "Normal Traffic": 0,
+    "Port Scanning":  1,
+    "Brute Force":    2,
+    "Web Attacks":    3,
+    "Bots":           4,
+    "DoS":            5,
+    "DDoS":           7,
+}
+
+STATE_NAMES = [
+    "Benign / Normal",
+    "Reconnaissance",
+    "Initial Access / Credential Access",
+    "Execution / Foothold",
+    "Command and Control",
+    "Lateral Movement",
+    "Exfiltration",
+    "Impact",
+]
+
+# Features that match what the frontend shows
+FEATURE_COLS = [
+    "Destination Port",
+    "Flow Duration",
+    "Flow Bytes/s",
+    "Flow Packets/s",
+    "Fwd Packet Length Mean",
+    "Bwd Packet Length Mean",
+    "Flow IAT Mean",
+    "Fwd Packets/s",
+    "Bwd Packets/s",
+    "Packet Length Std",
+    "FIN Flag Count",
+    "PSH Flag Count",
+    "ACK Flag Count",
+    "Init_Win_bytes_forward",
+    "Active Mean",
+    "Idle Mean",
+]
+
+def load_and_map(chunk_size: int = 200_000):
+    """Stream CSV in chunks, map labels, return feature matrix + labels."""
+    all_X, all_y = [], []
+    reader = pd.read_csv(RAW_CSV, chunksize=chunk_size)
+    total = 0
+    for chunk in reader:
+        # Drop rows with unknown labels
+        chunk = chunk[chunk["Attack Type"].isin(LABEL_MAP)]
+        chunk["state"] = chunk["Attack Type"].map(LABEL_MAP)
+
+        # Select features — drop missing
+        feats = [c for c in FEATURE_COLS if c in chunk.columns]
+        X = chunk[feats].copy()
+        X = X.replace([np.inf, -np.inf], np.nan).fillna(0).clip(-1e9, 1e9)
+
+        all_X.append(X.values.astype(np.float32))
+        all_y.append(chunk["state"].values.astype(np.int64))
+        total += len(chunk)
+        print(f"  Loaded {total:,} flows...", end="\r")
+
+    print(f"\nOK Total flows loaded: {total:,}")
+    return np.concatenate(all_X), np.concatenate(all_y), feats
+
+
+def make_sequences(X: np.ndarray, y: np.ndarray, seq_len: int = 20, stride: int = 10):
+    """
+    Slide a window over sorted flows to create sequences for GRU training.
+    Each sequence is (seq_len, n_features) → label = last state in window.
+    """
+    seqs, labels = [], []
+    n = len(X)
+    for start in range(0, n - seq_len, stride):
+        end = start + seq_len
+        seqs.append(X[start:end])
+        labels.append(y[end - 1])  # predict the current state
+
+    seqs   = np.array(seqs,   dtype=np.float32)
+    labels = np.array(labels, dtype=np.int64)
+    print(f"OK Sequences: {seqs.shape}  Labels: {labels.shape}")
+    return seqs, labels
+
+
+def compute_transition_matrix(y: np.ndarray, n_states: int = 8) -> np.ndarray:
+    """Compute real empirical transition matrix from label sequence."""
+    T = np.zeros((n_states, n_states), dtype=np.float64)
+    for a, b in zip(y[:-1], y[1:]):
+        T[a, b] += 1
+    # Row-normalise (add small epsilon for unseen transitions)
+    row_sums = T.sum(axis=1, keepdims=True) + 1e-6
+    T = T / row_sums
+    return T.astype(np.float32)
+
+
+def main():
+    print("=" * 60)
+    print("AttackCast — CICIDS-2017 Ingestion Pipeline")
+    print("=" * 60)
+
+    print("\n[1/4] Loading CSV and mapping labels...")
+    X, y, feat_names = load_and_map()
+
+    # Print state distribution
+    print("\n  State distribution in real data:")
+    unique, counts = np.unique(y, return_counts=True)
+    for s, c in zip(unique, counts):
+        print(f"    State {s} ({STATE_NAMES[s]:40s}): {c:>8,} flows  ({c/len(y)*100:.1f}%)")
+
+    print("\n[2/4] Computing empirical transition matrix...")
+    T = compute_transition_matrix(y)
+    print("  Transition matrix (real attack progressions):")
+    header = "       " + "".join(f"  S{i}" for i in range(8))
+    print(header)
+    for i, row in enumerate(T):
+        print(f"  S{i}  " + "".join(f"{v:5.2f}" for v in row))
+
+    print("\n[3/4] Building sequences for GRU training...")
+    X_seq, y_seq = make_sequences(X, y, seq_len=20, stride=10)
+
+    # Train/val/test split (70/15/15)
+    n = len(X_seq)
+    i1, i2 = int(n * 0.70), int(n * 0.85)
+    splits = {
+        "X_train": X_seq[:i1],  "y_train": y_seq[:i1],
+        "X_val":   X_seq[i1:i2],"y_val":   y_seq[i1:i2],
+        "X_test":  X_seq[i2:],  "y_test":  y_seq[i2:],
+    }
+    for k, v in splits.items():
+        print(f"    {k}: {v.shape}")
+
+    print("\n[4/4] Saving processed data...")
+    np.save(OUT_DIR / "transition_matrix.npy", T)
+    for k, v in splits.items():
+        np.save(OUT_DIR / f"{k}.npy", v)
+
+    # Save feature names and state map as JSON
+    import json
+    meta = {
+        "feature_cols": feat_names,
+        "state_names":  STATE_NAMES,
+        "label_map":    LABEL_MAP,
+        "n_states":     8,
+        "seq_len":      20,
+        "dataset":      "CICIDS-2017 (cleaned, Kaggle: ericanacletoribeiro)",
+        "total_flows":  int(len(y)),
+        "total_seqs":   int(len(X_seq)),
+    }
+    with open(OUT_DIR / "meta.json", "w") as f:
+        json.dump(meta, f, indent=2)
+
+    print(f"\nDONE Saved to {OUT_DIR}/")
+    print("   transition_matrix.npy, X_train/val/test.npy, y_train/val/test.npy, meta.json")
+    return splits, T, feat_names
+
+
+if __name__ == "__main__":
+    main()
