@@ -96,13 +96,35 @@ export function About() {
         </Panel>
       </div>
 
-      <Panel title="What is real in this build">
+      <Panel title="Cloud Deployment & Live API">
         <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted marker:text-subtle">
-          <li>Real, running code: PCAP parsing and flow building, heuristic stage rules, logistic regression and Markov baselines, temperature scaling, the feedback rule, and every metric shown on Model Performance.</li>
-          <li>Synthetic: all training and evaluation data, the live replay scenarios, and the campaign score.</li>
-          <li>Not built here: the PyTorch world model, graph layer, SHAP, and the FastAPI server. They need a Python environment and the real datasets.</li>
+          <li>
+            <strong className="text-fg">Cloud Backend:</strong> Live on Render at{' '}
+            <a
+              href="https://attackcast.onrender.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-accent underline font-mono"
+            >
+              https://attackcast.onrender.com
+            </a>{' '}
+            (FastAPI + Async WebSockets + PyTorch GRU World Model).
+          </li>
+          <li>
+            <strong className="text-fg">Real Dataset:</strong> Ingested 2,520,751 flows from CICIDS-2017 mapped to 8 MITRE ATT&CK stages.
+          </li>
+          <li>
+            <strong className="text-fg">Swagger API Documentation:</strong>{' '}
+            <a
+              href="https://attackcast.onrender.com/docs"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-accent underline font-mono"
+            >
+              https://attackcast.onrender.com/docs
+            </a>
+          </li>
         </ul>
       </Panel>
     </div>);
-
 }
