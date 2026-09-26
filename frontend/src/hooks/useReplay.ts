@@ -20,6 +20,7 @@ export function useReplay() {
     }
 
     let isUsingWs = false;
+    let lastWsMessage = Date.now();
 
     // Attempt starting a live backend WebSocket replay session
     fetch(`${BACKEND_URL}/api/replay/start`, {
@@ -40,6 +41,7 @@ export function useReplay() {
           isUsingWs = true;
 
           ws.onmessage = (evt) => {
+            lastWsMessage = Date.now();
             try {
               const raw = JSON.parse(evt.data);
               if (raw && raw.window_id !== undefined) {
@@ -64,9 +66,8 @@ export function useReplay() {
             }
           };
 
-          ws.onerror = () => {
-            isUsingWs = false;
-          };
+          ws.onerror = () => { isUsingWs = false; };
+          ws.onclose = () => { isUsingWs = false; };
         }
       })
       .catch(() => {
@@ -75,6 +76,16 @@ export function useReplay() {
 
     // Fallback timer tick
     const id = window.setInterval(() => {
+      // If the websocket hangs (e.g. on Vercel), fallback after 3 seconds of no messages
+      if (isUsingWs && wsRef.current) {
+        if (wsRef.current.readyState === WebSocket.CLOSED || wsRef.current.readyState === WebSocket.CLOSING) {
+          isUsingWs = false;
+        } else if (Date.now() - lastWsMessage > 3000) {
+          isUsingWs = false;
+          try { wsRef.current.close(); } catch (e) {}
+        }
+      }
+
       if (!isUsingWs) {
         dispatch({ type: 'tick' });
       }
