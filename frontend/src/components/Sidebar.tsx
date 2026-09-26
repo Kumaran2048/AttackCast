@@ -5,7 +5,7 @@ import {
   UploadIcon, XIcon, ChevronLeftIcon, ChevronRightIcon, MenuIcon,
 } from 'lucide-react';
 
-export type PageId = 'monitor' | 'campaign' | 'whatif' | 'performance' | 'data' | 'pcap' | 'about' | 'build';
+export type PageId = 'monitor' | 'campaign' | 'whatif' | 'performance' | 'data' | 'pcap' | 'about';
 
 const NAV: { id: PageId; label: string; Icon: React.ComponentType<{ className?: string; 'aria-hidden'?: boolean }> }[] = [
   { id: 'monitor',     label: 'Live Monitor',     Icon: ActivityIcon },
@@ -15,7 +15,6 @@ const NAV: { id: PageId; label: string; Icon: React.ComponentType<{ className?: 
   { id: 'data',        label: 'Data & States',     Icon: DatabaseIcon },
   { id: 'pcap',        label: 'PCAP Upload',       Icon: UploadIcon },
   { id: 'about',       label: 'About',             Icon: InfoIcon },
-  { id: 'build',       label: 'Build Status',      Icon: ListChecksIcon },
 ];
 
 interface SidebarProps {

@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { Sidebar, type PageId } from './components/Sidebar';
 import { ReplayProvider } from './contexts/ReplayContext';
 import { About } from './pages/About';
-import { BuildStatus } from './pages/BuildStatus';
 import { CampaignView } from './pages/CampaignView';
 import { DataStates } from './pages/DataStates';
 import { LiveMonitor } from './pages/LiveMonitor';
@@ -19,7 +18,6 @@ const PAGES: Record<PageId, React.ComponentType> = {
   data: DataStates,
   pcap: PcapUpload,
   about: About,
-  build: BuildStatus,
 };
 
 export function App() {
@@ -55,12 +53,12 @@ export function App() {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-ok opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-ok"></span>
               </span>
-              <span className="font-semibold text-accent tracking-wide uppercase text-[11px]">Real Benchmark Pipeline:</span>
+              <span className="font-semibold text-accent tracking-wide uppercase text-[11px]">Real-Time Attack Forecasting:</span>
               <span className="text-muted">
                 {health ? (
-                  <>API Backend Connected (<span className="text-fg font-medium">{health.dataset || 'CICIDS-2017'}</span> · {health.total_flows ? `${(health.total_flows / 1e6).toFixed(2)}M` : '2.52M'} flows · Model Ready)</>
+                  <>API Backend Active (<span className="text-fg font-medium">{health.dataset || 'CIC-IDS Benchmark'}</span> · Model Ready)</>
                 ) : (
-                  'Live temporal attack forecasting evaluated on CIC-IDS-2017/2018 & CTU-13 dataset flows (2.52M canonical records)'
+                  'Live temporal multi-step forecasting engine evaluated on benchmark split'
                 )}
               </span>
             </div>
