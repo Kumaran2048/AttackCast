@@ -70,7 +70,7 @@ export function App() {
           </div>
           <main className="min-w-0 flex-1">
             <div className="mx-auto max-w-[1440px] p-4 lg:p-6">
-              <Page />
+              <Page onNavigate={setPage} />
             </div>
           </main>
         </div>

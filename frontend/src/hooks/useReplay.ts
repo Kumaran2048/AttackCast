@@ -7,7 +7,7 @@ const BASE_TICK_MS = 1200;
 
 export function useReplay() {
   const [state, dispatch] = useReducer(replayReducer, undefined, () => newSession('infiltration', 1));
-  const scenario = getScenario(state.scenarioId);
+  const scenario = (state.customScenario && state.scenarioId === state.customScenario.id) ? state.customScenario : getScenario(state.scenarioId);
   const wsRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {

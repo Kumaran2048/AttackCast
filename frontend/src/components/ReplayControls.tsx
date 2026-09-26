@@ -23,6 +23,11 @@ export function ReplayControls() {
             onChange={(e) => dispatch({ type: 'scenario', id: e.target.value })}
             className="w-full rounded-md border border-line bg-raised px-3 py-2 text-sm text-fg focus:outline-none focus:ring-2 focus:ring-accent/60">
             
+            {state.customScenario && (
+              <option value={state.customScenario.id}>
+                {state.customScenario.name}
+              </option>
+            )}
             {SCENARIOS.map((s) =>
             <option key={s.id} value={s.id}>{s.name}{s.is_multi_host ? ' · multi-host' : ''}</option>
             )}

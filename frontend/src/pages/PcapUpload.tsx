@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { DownloadIcon, FileUpIcon, FlaskConicalIcon, LoaderCircleIcon, CheckCircle2Icon } from 'lucide-react';
+import { DownloadIcon, FileUpIcon, FlaskConicalIcon, LoaderCircleIcon, CheckCircle2Icon, PlayIcon } from 'lucide-react';
 import { Panel } from '../components/Panel';
 import { ReachHeatmap } from '../components/ReachHeatmap';
 import { Tag } from '../components/Tag';
@@ -8,6 +8,9 @@ import { rolloutHorizons } from '../utils/forecast';
 import { generateSamplePcap, parsePcap, PcapError, type ParseResult } from '../utils/pcap';
 import { aggregateFlows, windowFlows, type Flow, type PcapWindow } from '../utils/pcapFlows';
 import { BACKEND_URL } from '../utils/apiConfig';
+import { useReplayContext } from '../contexts/ReplayContext';
+import { pcapToScenarioAndUpdates } from '../utils/pcapToScenario';
+import type { PageId } from '../components/Sidebar';
 
 interface Analysis {
   name: string;
@@ -17,10 +20,14 @@ interface Analysis {
   windows: PcapWindow[];
 }
 
+interface PcapUploadProps {
+  onNavigate?: (p: PageId) => void;
+}
+
 const MAX_BYTES = 50 * 1024 * 1024;
 const FEATURE_COLS = ['n_flows', 'unique_dst_ports', 'syn_only_ratio', 'same_dst_port_max', 'bytes_out_in_ratio', 'internal_spread'];
 
-export function PcapUpload() {
+export function PcapUpload({ onNavigate }: PcapUploadProps) {
   const [status, setStatus] = useState<'idle' | 'running' | 'done' | 'error'>('idle');
   const [error, setError] = useState('');
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
@@ -53,7 +60,6 @@ export function PcapUpload() {
       return;
     }
 
-    // Try posting to real backend
     try {
       const formData = new FormData();
       formData.append('file', file);
@@ -130,12 +136,13 @@ export function PcapUpload() {
         </div>
       }
       {status === 'error' && <div role="alert" className="rounded-lg border border-crit/40 bg-crit/10 p-4 text-sm text-crit">{error}</div>}
-      {status === 'done' && analysis && <Results a={analysis} />}
+      {status === 'done' && analysis && <Results a={analysis} onNavigate={onNavigate} />}
     </div>);
 
 }
 
-function Results({ a }: {a: Analysis;}) {
+function Results({ a, onNavigate }: { a: Analysis; onNavigate?: (p: PageId) => void }) {
+  const { dispatch } = useReplayContext();
   const worst = useMemo(() => a.windows.reduce((w, x) => x.state > w.state ? x : w, a.windows[0]), [a.windows]);
   const horizons = useMemo(() => {
     const belief = new Array(8).fill(0);
@@ -146,17 +153,39 @@ function Results({ a }: {a: Analysis;}) {
   const hosts = [...new Set(a.windows.map((w) => w.host))];
   const maxIdx = Math.max(...a.windows.map((w) => w.index));
 
+  const handleStreamInMonitor = () => {
+    try {
+      const { scenario, updates } = pcapToScenarioAndUpdates(a.windows, a.name);
+      dispatch({ type: 'load-custom-pcap', scenario, updates });
+      if (onNavigate) {
+        onNavigate('monitor');
+      }
+    } catch (e) {
+      console.error('Failed to stream PCAP in monitor:', e);
+    }
+  };
+
   return (
     <>
-      <section className="grid grid-cols-2 gap-4 rounded-lg border border-line bg-surface p-5 md:grid-cols-5">
-        <div className="col-span-2 md:col-span-1">
-          <p className="truncate font-mono text-sm text-fg">{a.name}</p>
-          {a.synthetic ? <Tag tone="synthetic">synthetic</Tag> : <Tag>uploaded</Tag>}
+      <section className="flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-lg border border-accent/40 bg-surface p-5">
+        <div className="grid grid-cols-2 gap-4 md:flex md:items-center md:gap-8 flex-1">
+          <div className="col-span-2 md:col-span-1">
+            <p className="truncate font-mono text-sm text-fg font-semibold">{a.name}</p>
+            {a.synthetic ? <Tag tone="synthetic">synthetic sample</Tag> : <Tag tone="real">custom pcap</Tag>}
+          </div>
+          <Stat value={a.parse.total} label="packets" />
+          <Stat value={a.parse.skipped} label="skipped (non-IPv4)" />
+          <Stat value={a.flows.length} label="flows" />
+          <Stat value={a.windows.length} label="windows" />
         </div>
-        <Stat value={a.parse.total} label="packets" />
-        <Stat value={a.parse.skipped} label="skipped (non-IPv4 / other)" />
-        <Stat value={a.flows.length} label="flows" />
-        <Stat value={a.windows.length} label="host-windows" />
+
+        <button
+          type="button"
+          onClick={handleStreamInMonitor}
+          className="flex items-center justify-center gap-2 rounded-md bg-accent px-4 py-2.5 text-sm font-semibold text-bg transition-all duration-150 hover:opacity-90 shadow-md whitespace-nowrap self-stretch md:self-auto">
+          <PlayIcon className="h-4 w-4" fill="currentColor" />
+          Stream Capture in Live Monitor
+        </button>
       </section>
 
       <Panel title="Heuristic stage per host and window" aside={<Tag tone="heuristic">heuristic rules</Tag>}>

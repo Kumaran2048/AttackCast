@@ -1,4 +1,4 @@
-import { getScenario } from '../data/scenarios';
+import { getScenario, type Scenario } from '../data/scenarios';
 import type { FeedbackAction, FeedbackEvent, FeedbackSummary, WindowUpdate } from '../types/attackcast';
 import { applyFeedback, biasFor, effectiveWatchThreshold, type FeedbackState } from './feedbackRule';
 import { round } from './forecast';
@@ -8,6 +8,8 @@ export interface ReplayState {
   sessionSeq: number;
   sessionId: string;
   scenarioId: string;
+  customScenario?: Scenario;
+  customUpdates?: WindowUpdate[];
   K: number;
   speed: number;
   playing: boolean;
@@ -29,7 +31,8 @@ export type ReplayAction =
   | { type: 'reset' }
   | { type: 'select-host'; entity: string }
   | { type: 'feedback'; windowId: number; host: string; action: FeedbackAction }
-  | { type: 'push-update'; update: WindowUpdate };
+  | { type: 'push-update'; update: WindowUpdate }
+  | { type: 'load-custom-pcap'; scenario: Scenario; updates: WindowUpdate[] };
 
 export function resolutionKey(windowId: number, host: string): string {
   return `${windowId}|${host}`;
@@ -59,7 +62,15 @@ export function computeSummary(updates: WindowUpdate[], events: FeedbackEvent[])
 }
 
 function appendWindow(state: ReplayState): ReplayState {
-  const sc = getScenario(state.scenarioId);
+  if (state.customUpdates && state.customUpdates.length > 0 && state.scenarioId === state.customScenario?.id) {
+    const w = state.updates.length;
+    if (w >= state.customUpdates.length) return { ...state, playing: false };
+    const draft = state.customUpdates[w];
+    const updates = [...state.updates, draft];
+    draft.feedback_summary = computeSummary(updates, state.events);
+    return { ...state, updates, playing: state.playing && updates.length < state.customUpdates.length };
+  }
+  const sc = (state.customScenario && state.scenarioId === state.customScenario.id) ? state.customScenario : getScenario(state.scenarioId);
   const w = state.updates.length;
   if (w >= sc.windows) return { ...state, playing: false };
   const draft = buildWindowUpdate(sc, w, state.K, state.feedback, state.sessionId, computeSummary(state.updates, state.events));
@@ -90,10 +101,11 @@ export function replayReducer(state: ReplayState, action: ReplayAction): ReplayS
   switch (action.type) {
     case 'tick':
       return appendWindow(state);
-    case 'play':{
-        const done = state.updates.length >= getScenario(state.scenarioId).windows;
-        return done ? state : { ...state, playing: true };
-      }
+    case 'play': {
+      const sc = (state.customScenario && state.scenarioId === state.customScenario.id) ? state.customScenario : getScenario(state.scenarioId);
+      const done = state.updates.length >= sc.windows;
+      return done ? state : { ...state, playing: true };
+    }
     case 'pause':
       return { ...state, playing: false };
     case 'speed':
@@ -104,15 +116,44 @@ export function replayReducer(state: ReplayState, action: ReplayAction): ReplayS
       return { ...state, selectedHost: action.entity };
     case 'scenario':
       return newSession(action.id, state.sessionSeq + 1, state.K, state.speed);
-    case 'reset':
-      return newSession(state.scenarioId, state.sessionSeq + 1, state.K, state.speed);
-    case 'seek':{
-        const target = Math.max(1, Math.min(action.position, getScenario(state.scenarioId).windows));
-        if (target <= state.updates.length) return { ...state, updates: state.updates.slice(0, target) };
-        let next = state;
-        while (next.updates.length < target) next = appendWindow(next);
-        return next;
+    case 'reset': {
+      if (state.customScenario && state.scenarioId === state.customScenario.id && state.customUpdates) {
+        return {
+          ...state,
+          playing: false,
+          updates: [state.customUpdates[0]],
+          feedback: {},
+          events: [],
+          resolutions: {},
+        };
       }
+      return newSession(state.scenarioId, state.sessionSeq + 1, state.K, state.speed);
+    }
+    case 'seek': {
+      const sc = (state.customScenario && state.scenarioId === state.customScenario.id) ? state.customScenario : getScenario(state.scenarioId);
+      const target = Math.max(1, Math.min(action.position, sc.windows));
+      if (target <= state.updates.length) return { ...state, updates: state.updates.slice(0, target) };
+      let next = state;
+      while (next.updates.length < target) next = appendWindow(next);
+      return next;
+    }
+    case 'load-custom-pcap': {
+      return {
+        sessionSeq: state.sessionSeq + 1,
+        sessionId: `sess-pcap-${state.sessionSeq + 1}`,
+        scenarioId: action.scenario.id,
+        customScenario: action.scenario,
+        customUpdates: action.updates,
+        K: state.K,
+        speed: state.speed,
+        playing: true,
+        updates: [action.updates[0]],
+        feedback: {},
+        events: [],
+        resolutions: {},
+        selectedHost: action.scenario.hosts[0].entity,
+      };
+    }
     case 'feedback':{
         const u = state.updates.find((x) => x.window_id === action.windowId);
         const h = u?.hosts.find((x) => x.entity === action.host);
