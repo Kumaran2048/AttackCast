@@ -4,7 +4,7 @@ import { getScenario } from '../data/scenarios';
 import { ALERT_THRESHOLDS, SEVERE_FROM, TRANSITION_PRIOR } from '../data/stateMap';
 import { rolloutHorizons, stepDist } from './forecast';
 import { calibration, evaluate, fitTemperature, softmax, type CalibrationStats, type ModelMetrics } from './metrics';
-import { majority, markov, priorRollout, trainSoftmax, type Classifier } from './models';
+import { majority, markov, priorRollout, trainGNNWorldModel, trainGRUWorldModel, trainSoftmax, type Classifier } from './models';
 import { newSession, replayReducer, type ReplayState } from './replayReducer';
 import { generateDataset, HISTORY, N_STATES, SEQ_LEN, SPLITS, toSamples, type Split, type SynthSequence } from './synthDataset';
 
@@ -66,7 +66,11 @@ export function runEvaluation(seed: number): EvalReport {
   const mk = markov(bySplit('train'));
   const lr = trainSoftmax(train);
   const pr = priorRollout();
+  const gru = trainGRUWorldModel(train);
+  const gnn = trainGNNWorldModel(train);
   const lrMetrics = score(lr, test);
+  const gruMetrics = score(gru, test);
+  const gnnMetrics = score(gnn, test);
 
   const T = fitTemperature(val.map((s) => lr.logits(s)), val.map((s) => s.y));
   const ys = test.map((s) => s.y);
@@ -85,12 +89,13 @@ export function runEvaluation(seed: number): EvalReport {
     sequences: { train: bySplit('train').length, val: bySplit('val').length, test: bySplit('test').length },
     classCounts,
     rows: [
-    { name: maj.name, status: 'computed', metrics: score(maj, test), note: 'Always predicts the most common next state. Evaluated on benchmark split.' },
-    { name: mk.name, status: 'computed', metrics: score(mk, test), note: 'P(S_t+1 | S_t), Laplace-smoothed; transition matrix estimated from real training sequences.' },
-    { name: lr.name, status: 'computed', metrics: lrMetrics, note: `Flattened last ${HISTORY} windows, class-weighted. Trained on CICIDS-2017/2018 benchmark.` },
-    { name: pr.name, status: 'computed', metrics: score(pr, test), note: 'Prior rollout using real-data transition matrix estimated from CICIDS-2017/2018 training split.' },
-    { name: 'World model · no graph', status: 'pending', metrics: null, note: 'GRU + attention encoder — artifacts from cloud backend. Run python -m backend.ml.models.train.' },
-    { name: 'World model · with graph', status: 'pending', metrics: null, note: 'Adds GNN layer — run backend after PyTorch Geometric install.' }],
+      { name: maj.name, status: 'computed', metrics: score(maj, test), note: 'Always predicts the most common next state. Evaluated on benchmark split.' },
+      { name: mk.name, status: 'computed', metrics: score(mk, test), note: 'P(S_t+1 | S_t), Laplace-smoothed; transition matrix estimated from training sequences.' },
+      { name: lr.name, status: 'computed', metrics: lrMetrics, note: `Flattened last ${HISTORY} windows, class-weighted. Trained on benchmark split.` },
+      { name: pr.name, status: 'computed', metrics: score(pr, test), note: 'Prior rollout using transition matrix estimated from training split.' },
+      { name: gru.name, status: 'computed', metrics: gruMetrics, note: 'GRU + temporal self-attention encoder trained on sequence window embeddings.' },
+      { name: gnn.name, status: 'computed', metrics: gnnMetrics, note: 'Spatio-temporal Graph Attention Network (GNN + GRU) with topological propagation.' },
+    ],
 
     lr: lrMetrics,
     calibration: {

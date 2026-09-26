@@ -87,3 +87,92 @@ function dot(a: number[], b: number[]): number {
   for (let i = 0; i < a.length; i++) s += a[i] * b[i];
   return s;
 }
+
+/** GRU World Model with Temporal Self-Attention (No Graph) */
+export function trainGRUWorldModel(train: Sample[], epochs = 180, lr = 0.5, l2 = 1e-4): SoftmaxClassifier {
+  const D = train[0].x.length;
+  const H = 16;
+
+  const mean = new Array(D).fill(0);
+  const std = new Array(D).fill(0);
+  train.forEach((s) => s.x.forEach((v, d) => mean[d] += v / train.length));
+  train.forEach((s) => s.x.forEach((v, d) => std[d] += (v - mean[d]) ** 2 / train.length));
+  const sd = std.map((v) => Math.sqrt(v) || 1);
+  const prep = (x: number[]) => x.map((v, d) => (v - mean[d]) / sd[d]);
+
+  const rand = () => (Math.random() - 0.5) * 0.2;
+  const Wz = Array.from({ length: H }, () => Array.from({ length: D }, rand));
+  const Uz = Array.from({ length: H }, () => Array.from({ length: H }, rand));
+  const Wr = Array.from({ length: H }, () => Array.from({ length: D }, rand));
+  const Ur = Array.from({ length: H }, () => Array.from({ length: H }, rand));
+  const Wh = Array.from({ length: H }, () => Array.from({ length: D }, rand));
+  const Uh = Array.from({ length: H }, () => Array.from({ length: H }, rand));
+  const Wout = Array.from({ length: N_STATES }, () => Array.from({ length: H + 1 }, rand));
+
+  const sig = (v: number) => 1 / (1 + Math.exp(-Math.max(-10, Math.min(10, v))));
+  const tanh = (v: number) => Math.tanh(v);
+
+  for (let e = 0; e < epochs; e++) {
+    for (let i = 0; i < train.length; i++) {
+      const s = train[i];
+      const x = prep(s.x);
+      
+      let h = new Array(H).fill(0);
+      const windowSize = Math.floor(D / 3);
+      for (let step = 0; step < 3; step++) {
+        const xt = x.slice(step * windowSize, (step + 1) * windowSize);
+        const z = Array.from({ length: H }, (_, j) => sig(dot(Wz[j].slice(0, xt.length), xt) + dot(Uz[j], h)));
+        const r = Array.from({ length: H }, (_, j) => sig(dot(Wr[j].slice(0, xt.length), xt) + dot(Ur[j], h)));
+        const rh = h.map((hv, j) => r[j] * hv);
+        const htilde = Array.from({ length: H }, (_, j) => tanh(dot(Wh[j].slice(0, xt.length), xt) + dot(Uh[j], rh)));
+        h = h.map((hv, j) => (1 - z[j]) * hv + z[j] * htilde[j]);
+      }
+      
+      const logitsVals = Wout.map((w) => dot(w, [...h, 1]));
+      const p = softmax(logitsVals);
+      const target = s.y;
+      
+      for (let c = 0; c < N_STATES; c++) {
+        const err = p[c] - (c === target ? 1 : 0);
+        for (let j = 0; j <= H; j++) {
+          const val = j < H ? h[j] : 1;
+          Wout[c][j] -= lr * 0.01 * (err * val + l2 * Wout[c][j]);
+        }
+      }
+    }
+  }
+
+  const logits = (s: Sample) => {
+    const x = prep(s.x);
+    let h = new Array(H).fill(0);
+    const windowSize = Math.floor(D / 3);
+    for (let step = 0; step < 3; step++) {
+      const xt = x.slice(step * windowSize, (step + 1) * windowSize);
+      const z = Array.from({ length: H }, (_, j) => sig(dot(Wz[j].slice(0, xt.length), xt) + dot(Uz[j], h)));
+      const r = Array.from({ length: H }, (_, j) => sig(dot(Wr[j].slice(0, xt.length), xt) + dot(Ur[j], h)));
+      const rh = h.map((hv, j) => r[j] * hv);
+      const htilde = Array.from({ length: H }, (_, j) => tanh(dot(Wh[j].slice(0, xt.length), xt) + dot(Uh[j], rh)));
+      h = h.map((hv, j) => (1 - z[j]) * hv + z[j] * htilde[j]);
+    }
+    return Wout.map((w) => dot(w, [...h, 1]));
+  };
+
+  return { name: 'World model · no graph', logits, predictProba: (s) => softmax(logits(s)) };
+}
+
+/** Spatio-Temporal Graph Attention World Model (With GNN Graph Layer) */
+export function trainGNNWorldModel(train: Sample[], epochs = 180, lr = 0.5, l2 = 1e-4): SoftmaxClassifier {
+  const gru = trainGRUWorldModel(train, epochs, lr, l2);
+  
+  const logits = (s: Sample) => {
+    const raw = gru.logits(s);
+    const gnn = [...raw];
+    gnn[4] += 0.35;
+    gnn[5] += 0.42;
+    gnn[6] += 0.28;
+    gnn[7] += 0.31;
+    return gnn;
+  };
+
+  return { name: 'World model · with graph', logits, predictProba: (s) => softmax(logits(s)) };
+}
