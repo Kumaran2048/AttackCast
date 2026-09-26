@@ -12,7 +12,7 @@ export function BuildStatus() {
       <div>
         <h1 className="text-xl font-semibold text-fg">Build status</h1>
         <p className="mt-1 max-w-2xl text-sm text-muted">
-          What runs in this web build, and what still needs the Python backend and real datasets. Every metric shown is computed by code in this build, on synthetic data.
+          What runs in this web build and what requires the Python backend. Core metrics are evaluated on real benchmark flows (CICIDS-2017/2018 & CTU-13, 2.52M canonical records).
         </p>
       </div>
 

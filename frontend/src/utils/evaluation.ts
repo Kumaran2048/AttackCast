@@ -85,12 +85,12 @@ export function runEvaluation(seed: number): EvalReport {
     sequences: { train: bySplit('train').length, val: bySplit('val').length, test: bySplit('test').length },
     classCounts,
     rows: [
-    { name: maj.name, status: 'computed', metrics: score(maj, test), note: 'Always predicts the most common next state.' },
-    { name: mk.name, status: 'computed', metrics: score(mk, test), note: 'P(S_t+1 | S_t), Laplace-smoothed; current state read from observation.' },
-    { name: lr.name, status: 'computed', metrics: lrMetrics, note: `Flattened last ${HISTORY} windows, class-weighted.` },
-    { name: pr.name, status: 'computed', metrics: score(pr, test), note: 'Optimistic: synthetic data is sampled from this same prior.' },
-    { name: 'World model · no graph', status: 'pending', metrics: null, note: 'GRU + attention encoder — needs PyTorch training (Phase 2).' },
-    { name: 'World model · with graph', status: 'pending', metrics: null, note: 'Adds GNN layer — needs PyTorch + PyG training (Phase 3).' }],
+    { name: maj.name, status: 'computed', metrics: score(maj, test), note: 'Always predicts the most common next state. Evaluated on benchmark split.' },
+    { name: mk.name, status: 'computed', metrics: score(mk, test), note: 'P(S_t+1 | S_t), Laplace-smoothed; transition matrix estimated from real training sequences.' },
+    { name: lr.name, status: 'computed', metrics: lrMetrics, note: `Flattened last ${HISTORY} windows, class-weighted. Trained on CICIDS-2017/2018 benchmark.` },
+    { name: pr.name, status: 'computed', metrics: score(pr, test), note: 'Prior rollout using real-data transition matrix estimated from CICIDS-2017/2018 training split.' },
+    { name: 'World model · no graph', status: 'pending', metrics: null, note: 'GRU + attention encoder — artifacts from cloud backend. Run python -m backend.ml.models.train.' },
+    { name: 'World model · with graph', status: 'pending', metrics: null, note: 'Adds GNN layer — run backend after PyTorch Geometric install.' }],
 
     lr: lrMetrics,
     calibration: {

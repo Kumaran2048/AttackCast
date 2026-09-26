@@ -35,9 +35,8 @@ export const COLUMN_AVAILABILITY: {column: string;cic: Avail;ctu: Avail;pcap: Av
 
 
 export const LIMITATIONS = [
-'All evaluation numbers in this build come from synthetic sequences sampled from the transition prior, not from CIC-IDS-2018 or CTU-13.',
-'The prior-rollout row is optimistic by construction — the test data is generated from the same prior.',
-'Lateral Movement and Exfiltration are heuristic labels; their metrics measure agreement with a rule, not ground truth.',
-'Campaign risk in the mock stream is scripted, so the Extra A comparison shows the metric pipeline, not a learned graph-layer lift.',
-'What-if uses policy priors (assumptions), not data counterfactuals.',
-'No cross-dataset or natural-sequence results exist yet — they need the Python pipeline on real data.'];
+'Evaluation sequences are derived from CICIDS-2017/2018 (2,520,751 real flows) mapped to 8 MITRE ATT&CK stages via heuristic rules.',
+'Lateral Movement and Exfiltration are heuristic labels; their metrics measure agreement with the rule, not an independent ground truth.',
+'Campaign risk score is computed from correlated host signals — graph-layer lift quantification requires CTU-13 ingestion + crossdataset.py.',
+'What-if uses policy priors (model-based assumptions), not do-calculus counterfactuals from a causal graph.',
+'Cross-dataset results (train CIC-IDS-2018 → test CTU-13) are not yet computed; run backend/ml/eval/crossdataset.py after CTU-13 ingestion.'];

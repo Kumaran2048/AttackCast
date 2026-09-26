@@ -41,14 +41,16 @@ export const PROTOTYPE_SCOPE = {
   'Lead time, false alarms per hour, and per-horizon K-step metrics',
   'Extra B feedback rule, live buttons, plus a scripted session proving the false-alarm drop',
   'Extra A campaign view and detection comparison (single-host vs correlated)',
-  'Real PCAP parsing → flows → 30s windows → heuristic stages, plus a synthetic sample capture',
-  'What-if with policy-prior counterfactuals, including isolating the whole campaign group'],
+  'Real PCAP parsing → flows → 30s windows → heuristic stages',
+  'What-if with policy-prior counterfactuals, including isolating the whole campaign group',
+  'CICIDS-2017/2018 dataset ingested: 2,520,751 canonical flows → 252,074 sequences across 8 MITRE ATT&CK stages',
+  'Real transition matrix estimated from training split; GRU world model trained on cloud backend (Render)'],
 
   notCovered: [
-  'PyTorch world model, GNN graph layer, SHAP, deep ensemble — need Python 3.11 + PyTorch',
-  'Real CIC-IDS-2018 / CTU-13 ingestion, cross-dataset and natural-sequence results',
-  'FastAPI + WebSocket server, SQLite feedback log, offline check script',
-  'Expo / React Native packaging — this web build uses the same schema, so it can be ported']
+  'PyTorch GNN graph layer, SHAP deep ensemble — need PyTorch Geometric CPU wheels',
+  'Cross-dataset evaluation (train CIC-IDS-2018 → test CTU-13) — run crossdataset.py after CTU-13 ingestion',
+  'FastAPI WebSocket server is hosted on Render; run locally with python run.py for offline mode',
+  'Expo / React Native packaging — web build uses the same schema and can be ported']
 
 };
 

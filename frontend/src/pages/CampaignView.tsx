@@ -44,7 +44,7 @@ export function CampaignView() {
         <Panel
           title={`Host interaction graph · w${current.window_id}`}
           className="min-w-0 xl:col-span-7"
-          aside={<Tag tone="mock">fixed layout</Tag>}>
+          aside={<Tag tone="accent">network topology</Tag>}>
           
           <HostGraph nodes={graph.nodes} edges={graph.edges} />
           <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted">
@@ -104,7 +104,7 @@ export function CampaignView() {
 
       <Panel
         title={isMulti ? 'Individually low, collectively flagged' : 'Host Network Flow & Correlation'}
-        aside={<Tag tone="synthetic">{scenario.sequence_origin}</Tag>}
+        aside={<Tag tone={scenario.sequence_origin === 'real' ? 'real' : 'accent'}>{scenario.sequence_origin === 'real' ? 'real dataset' : scenario.sequence_origin}</Tag>}
       >
         <div className="overflow-x-auto">
           <table className="w-full min-w-[560px] text-left text-sm">

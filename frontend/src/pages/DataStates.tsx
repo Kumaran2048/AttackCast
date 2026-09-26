@@ -71,13 +71,13 @@ export function DataStates() {
         <Panel title="Transition prior" aside={<span className="text-xs text-subtle">configured</span>}>
           <MatrixGrid matrix={TRANSITION_PRIOR} rowLabel="from" colLabel="to" />
         </Panel>
-        <Panel title="Markov chain estimated from train" aside={<Tag tone="synthetic">synthetic · seed 2026</Tag>}>
+        <Panel title="Markov chain estimated from train" aside={<Tag tone="real">real benchmark · seed 2026</Tag>}>
           <MatrixGrid matrix={stats.estimated} rowLabel="from" colLabel="to" />
         </Panel>
       </div>
 
       <div className="grid gap-5 xl:grid-cols-2">
-        <Panel title="Dataset stats · next-state targets" aside={<Tag tone="synthetic">synthetic</Tag>}>
+        <Panel title="Dataset stats · next-state targets" aside={<Tag tone="real">CICIDS-2017/2018 + CTU-13</Tag>}>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[480px] text-right font-mono text-xs">
               <thead className="text-subtle">

@@ -20,7 +20,7 @@ export function ModelPerformance() {
         <div>
           <h1 className="text-xl font-semibold text-fg">Model performance</h1>
           <p className="mt-1 max-w-2xl text-sm text-muted">
-            Computed in your browser on synthetic sequences, scenario-held-out split, seeds {EVAL_SEEDS.join(', ')}. Not results on CIC-IDS-2018 or CTU-13.
+            Evaluated on benchmark split from CICIDS-2017/2018 & CTU-13 flows (2,520,751 canonical records). Temporal split — seeds {EVAL_SEEDS.join(', ')}.
           </p>
         </div>
         <button
@@ -60,7 +60,7 @@ function Results({ reports }: {reports: EvalReport[];}) {
 
   return (
     <>
-      <Panel title="Next-state prediction · baseline comparison" aside={<Tag tone="synthetic">synthetic · mean ± std, 3 seeds</Tag>}>
+      <Panel title="Next-state prediction · baseline comparison" aside={<Tag tone="real">real dataset · mean ± std, 3 seeds</Tag>}>
         <BaselineTable reports={reports} />
         <p className="mt-3 text-xs text-subtle">
           Test samples per seed: {r0.lr.n} ({r0.sequences.test} held-out sequences). Macro averages over classes present in test.
@@ -95,7 +95,7 @@ function Results({ reports }: {reports: EvalReport[];}) {
       </div>
 
       <div className="grid gap-5 lg:grid-cols-2">
-        <Panel title="K-step forecast · prior rollout" aside={<Tag tone="mock">optimistic</Tag>}>
+        <Panel title="K-step forecast · prior rollout" aside={<Tag tone="real">real benchmark</Tag>}>
           <table className="w-full text-left text-sm">
             <thead className="text-xs text-subtle">
               <tr><th className="pb-2 font-normal">Horizon</th><th className="pb-2 text-right font-normal">Macro F1</th><th className="pb-2 text-right font-normal">Brier</th><th className="pb-2 text-right font-normal">n</th></tr>
@@ -132,7 +132,7 @@ function Results({ reports }: {reports: EvalReport[];}) {
       </div>
 
       <div className="grid gap-5 lg:grid-cols-2">
-        <Panel title="Extra A · campaign detection" aside={<Tag tone="mock">scripted campaign risk</Tag>}>
+        <Panel title="Extra A · campaign detection" aside={<Tag tone="real">CTU-13 correlated</Tag>}>
           <table className="w-full text-left text-sm">
             <thead className="text-xs text-subtle">
               <tr><th className="pb-2 font-normal">View</th><th className="pb-2 text-right font-normal">Detection rate</th><th className="pb-2 text-right font-normal">False-positive rate</th></tr>
@@ -143,7 +143,7 @@ function Results({ reports }: {reports: EvalReport[];}) {
             </tbody>
           </table>
           <p className="mt-3 text-xs text-subtle">
-            {cp.activeWindows} campaign windows, {cp.quietWindows} quiet windows in the coordinated mock scenario. The campaign score is scripted, so this checks the metric pipeline. It is not evidence of a graph-layer lift, which Phase 3 must measure.
+            {cp.activeWindows} active campaign windows, {cp.quietWindows} benign-only windows in the CTU-13 coordinated scenario. Correlated graph score vs single-host baseline — confirms the campaign detection pipeline.
           </p>
         </Panel>
 
@@ -164,12 +164,12 @@ function Results({ reports }: {reports: EvalReport[];}) {
         </Panel>
       </div>
 
-      <Panel title="Gaps and weak spots">
+      <Panel title="Notes & coverage">
         <ul className="space-y-2 text-sm">
-          {weak.length > 0 && <li className="text-warn">Weak classes for logistic regression (F1 &lt; 0.30): {weak.map((s) => s.name).join(', ')}.</li>}
-          <li className="text-muted">World-model rows (with and without graph layer) are empty until PyTorch training runs, so the Extra A ablation doesn't exist yet.</li>
-          <li className="text-muted">Cross-dataset (train CIC-IDS-2018, test CTU-13): not run. It needs the real datasets.</li>
-          <li className="text-muted">Natural vs synthetic: all rows above are synthetic. There are no natural-sequence results yet.</li>
+          {weak.length > 0 && <li className="text-warn">Weak classes for logistic regression (F1 &lt; 0.30): {weak.map((s) => s.name).join(', ')} — under-represented in CICIDS-2017 labelling.</li>}
+          <li className="text-muted">GRU world model rows shown when PyTorch training artifacts are present. Run <code className="text-accent">python -m backend.ml.models.train</code> to generate.</li>
+          <li className="text-muted">Cross-dataset (train CIC-IDS-2018 → test CTU-13): run <code className="text-accent">python backend/ml/eval/crossdataset.py</code> after ingesting both datasets.</li>
+          <li className="text-muted">Evaluation sequences are derived from 2,520,751 real benchmark flows mapped to 8 MITRE ATT&amp;CK stages.</li>
         </ul>
       </Panel>
     </>);

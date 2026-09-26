@@ -3,7 +3,7 @@
 // Alert.base_score / adjusted_score — needed to show "individually low, collectively flagged".
 
 export type StateId = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
-export type SequenceOrigin = 'natural' | 'synthetic';
+export type SequenceOrigin = 'natural' | 'synthetic' | 'real' | 'benchmark';
 export type AlertLevel = 'none' | 'watch' | 'warning' | 'critical';
 export type FeedbackAction = 'confirm' | 'dismiss';
 

@@ -28,7 +28,9 @@ export function ReplayControls() {
             )}
           </select>
           <div className="mt-1.5 flex items-center gap-2">
-            <Tag tone="synthetic">{scenario.sequence_origin}</Tag>
+            <Tag tone={scenario.sequence_origin === 'real' ? 'real' : 'accent'}>
+              {scenario.sequence_origin === 'real' ? 'real dataset' : scenario.sequence_origin}
+            </Tag>
             <span className="truncate text-xs text-subtle">{scenario.source}</span>
           </div>
         </div>
