@@ -6,11 +6,14 @@ import { COLUMN_AVAILABILITY, HEURISTIC_RULES, LIMITATIONS, STATE_RATIONALE } fr
 import { STATES, TRANSITION_PRIOR } from '../data/stateMap';
 import { markov } from '../utils/models';
 import { generateDataset, SPLITS, toSamples } from '../utils/synthDataset';
+import { usePcapAnalysis } from '../contexts/PcapAnalysisContext';
 
 const AVAIL_CLASS = { yes: 'text-ok', no: 'text-crit', derived: 'text-accent', verify: 'text-warn' } as const;
 const CONF_TONE = { high: 'neutral', medium: 'accent', heuristic: 'heuristic' } as const;
 
 export function DataStates() {
+  const { analysis: pcapAnalysis } = usePcapAnalysis();
+
   const stats = useMemo(() => {
     const seqs = generateDataset(2026);
     const counts = SPLITS.map((sp) => {
@@ -21,6 +24,24 @@ export function DataStates() {
     return { counts, estimated: markov(seqs.filter((s) => s.split === 'train')).matrix };
   }, []);
 
+  const pcapStats = useMemo(() => {
+    if (!pcapAnalysis) return null;
+    const windows = pcapAnalysis.windows;
+    const hosts = [...new Set(windows.map((w) => w.host))];
+    const stateCounts = new Array(8).fill(0);
+    windows.forEach((w) => { stateCounts[w.state] = (stateCounts[w.state] || 0) + 1; });
+    const matrix: number[][] = Array.from({ length: 8 }, () => new Array(8).fill(0));
+    hosts.forEach((host) => {
+      const hw = windows.filter((w) => w.host === host).sort((a, b) => a.index - b.index);
+      for (let i = 0; i < hw.length - 1; i++) { matrix[hw[i].state][hw[i + 1].state]++; }
+    });
+    const normalized = matrix.map((row) => {
+      const sum = row.reduce((a, v) => a + v, 0);
+      return sum > 0 ? row.map((v) => v / sum) : row;
+    });
+    return { hosts, windows, stateCounts, matrix: normalized };
+  }, [pcapAnalysis]);
+
   return (
     <div className="space-y-5">
       <header>
@@ -28,6 +49,14 @@ export function DataStates() {
         <p className="mt-1 max-w-2xl text-sm text-muted">How traffic windows map to ATT&CK stages, which columns each source provides, and what the current data can and can't support.</p>
       </header>
 
+      {pcapStats && (
+        <div className="flex flex-wrap items-center gap-2.5 rounded-lg border border-accent/40 bg-accent/5 p-3 text-xs text-fg">
+          <span className="font-semibold text-accent">📡 Active source:</span>
+          <span className="font-mono text-fg">{pcapAnalysis!.name}</span>
+          <Tag tone={pcapAnalysis!.synthetic ? 'synthetic' : 'real'}>{pcapAnalysis!.synthetic ? 'synthetic sample' : 'your PCAP'}</Tag>
+          <span className="ml-auto text-subtle">{pcapStats.windows.length} windows · {pcapStats.hosts.length} hosts</span>
+        </div>
+      )}
       <Panel title="ATT&CK state map">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[820px] text-left text-sm">
@@ -71,13 +100,58 @@ export function DataStates() {
         <Panel title="Transition prior" aside={<span className="text-xs text-subtle">configured</span>}>
           <MatrixGrid matrix={TRANSITION_PRIOR} rowLabel="from" colLabel="to" />
         </Panel>
-        <Panel title="Markov chain estimated from train" aside={<Tag tone="real">real benchmark · seed 2026</Tag>}>
-          <MatrixGrid matrix={stats.estimated} rowLabel="from" colLabel="to" />
-        </Panel>
+        {pcapStats ? (
+          <Panel title="Markov chain from your PCAP" aside={<Tag tone="real">{pcapAnalysis!.name}</Tag>}>
+            <MatrixGrid matrix={pcapStats.matrix} rowLabel="from" colLabel="to" />
+          </Panel>
+        ) : (
+          <Panel title="Markov chain estimated from train" aside={<Tag tone="real">real benchmark · seed 2026</Tag>}>
+            <MatrixGrid matrix={stats.estimated} rowLabel="from" colLabel="to" />
+          </Panel>
+        )}
       </div>
 
       <div className="grid gap-5 xl:grid-cols-2">
-        <Panel title="Dataset stats · next-state targets" aside={<Tag tone="real">CICIDS-2017/2018 + CTU-13</Tag>}>
+        {pcapStats ? (
+          <Panel title="Window distribution by ATT&CK stage" aside={<Tag tone={pcapAnalysis!.synthetic ? 'synthetic' : 'real'}>{pcapAnalysis!.name}</Tag>}>
+            <div className="overflow-x-auto">
+              <table className="w-full text-right font-mono text-xs">
+                <thead className="text-subtle">
+                  <tr>
+                    <th className="pb-2 text-left font-sans font-normal">Stage</th>
+                    <th className="pb-2 font-normal">Windows</th>
+                    <th className="pb-2 font-normal">%</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-line">
+                  {STATES.map((s, i) => {
+                    const count = pcapStats.stateCounts[i] || 0;
+                    const pct = pcapStats.windows.length > 0 ? ((count / pcapStats.windows.length) * 100).toFixed(1) : '0.0';
+                    return (
+                      <tr key={s.id}>
+                        <td className="py-2 text-left font-sans">
+                          <span className="flex items-center gap-2 text-muted">
+                            <span className="h-2 w-2 rounded-sm shrink-0" style={{ backgroundColor: s.color }} aria-hidden />
+                            {s.name}
+                          </span>
+                        </td>
+                        <td className={`py-2 ${count === 0 ? 'text-subtle' : 'text-fg'}`}>{count}</td>
+                        <td className="py-2 text-subtle">{pct}%</td>
+                      </tr>
+                    );
+                  })}
+                  <tr className="border-t border-line">
+                    <td className="py-2 text-left font-sans font-semibold text-fg">Total</td>
+                    <td className="py-2 font-semibold text-fg">{pcapStats.windows.length}</td>
+                    <td className="py-2 text-subtle">100%</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-3 text-xs text-subtle">Stage classification via heuristic rules on 30s windows per host.</p>
+          </Panel>
+        ) : (
+          <Panel title="Dataset stats · next-state targets" aside={<Tag tone="real">CICIDS-2017/2018 + CTU-13</Tag>}>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[480px] text-right font-mono text-xs">
               <thead className="text-subtle">
@@ -100,6 +174,7 @@ export function DataStates() {
           </div>
           <p className="mt-3 text-xs text-subtle">Split by whole sequence (scenario-held-out), no windows shared across splits. Zero counts show in red.</p>
         </Panel>
+        )}
 
         <Panel title="Canonical column availability" aside={<span className="text-xs text-subtle">expected · verify in Phase 1</span>}>
           <table className="w-full text-left text-sm">

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Sidebar, type PageId } from './components/Sidebar';
 import { ReplayProvider } from './contexts/ReplayContext';
+import { PcapAnalysisProvider } from './contexts/PcapAnalysisContext';
 import { About } from './pages/About';
 import { CampaignView } from './pages/CampaignView';
 import { DataStates } from './pages/DataStates';
@@ -35,6 +36,7 @@ export function App() {
   const Page = PAGES[page];
 
   return (
+    <PcapAnalysisProvider>
     <ReplayProvider>
       {/*
         Mobile:  flex-col  → Sidebar renders topbar at top (full width), main below. Drawer is fixed.
@@ -77,5 +79,6 @@ export function App() {
 
       </div>
     </ReplayProvider>
+    </PcapAnalysisProvider>
   );
 }

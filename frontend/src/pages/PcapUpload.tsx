@@ -9,6 +9,7 @@ import { generateSamplePcap, parsePcap, PcapError, type ParseResult } from '../u
 import { aggregateFlows, windowFlows, type Flow, type PcapWindow } from '../utils/pcapFlows';
 import { BACKEND_URL } from '../utils/apiConfig';
 import { useReplayContext } from '../contexts/ReplayContext';
+import { usePcapAnalysis } from '../contexts/PcapAnalysisContext';
 import { pcapToScenarioAndUpdates } from '../utils/pcapToScenario';
 import type { PageId } from '../components/Sidebar';
 
@@ -30,10 +31,11 @@ const FEATURE_COLS = ['n_flows', 'unique_dst_ports', 'syn_only_ratio', 'same_dst
 export function PcapUpload({ onNavigate }: PcapUploadProps) {
   const [status, setStatus] = useState<'idle' | 'running' | 'done' | 'error'>('idle');
   const [error, setError] = useState('');
-  const [analysis, setAnalysis] = useState<Analysis | null>(null);
+  const [analysis, setLocalAnalysis] = useState<Analysis | null>(null);
   const [backendMessage, setBackendMessage] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const input = useRef<HTMLInputElement>(null);
+  const { setAnalysis: setGlobalAnalysis } = usePcapAnalysis();
 
   const analyze = (buf: ArrayBuffer, name: string, synthetic: boolean) => {
     setStatus('running');
@@ -43,7 +45,9 @@ export function PcapUpload({ onNavigate }: PcapUploadProps) {
         const parse = parsePcap(buf);
         if (!parse.packets.length) throw new PcapError('No IPv4 TCP/UDP packets found in this capture.');
         const flows = aggregateFlows(parse.packets);
-        setAnalysis({ name, synthetic, parse, flows, windows: windowFlows(flows) });
+        const a = { name, synthetic, parse, flows, windows: windowFlows(flows) };
+        setLocalAnalysis(a);
+        setGlobalAnalysis(a);
         setStatus('done');
       } catch (e) {
         setError(e instanceof PcapError ? e.message : 'Could not read this file.');

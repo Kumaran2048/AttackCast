@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2Icon, LoaderCircleIcon, RefreshCwIcon } from 'lucide-react';
 import { BaselineTable } from '../components/BaselineTable';
 import { MatrixGrid } from '../components/MatrixGrid';
@@ -11,10 +11,25 @@ import { EVAL_SEEDS, type EvalReport } from '../utils/evaluation';
 import { meanStd } from '../utils/metrics';
 import { pct } from '../utils/mockStream';
 import { fetchMetrics } from '../utils/apiConfig';
+import { usePcapAnalysis } from '../contexts/PcapAnalysisContext';
 
 export function ModelPerformance() {
   const { status, reports, progress, total, error, run } = useEvaluation();
   const [backendMetrics, setBackendMetrics] = useState<any>(null);
+  const { analysis: pcapAnalysis } = usePcapAnalysis();
+
+  const pcapSummary = useMemo(() => {
+    if (!pcapAnalysis) return null;
+    const windows = pcapAnalysis.windows;
+    const hosts = [...new Set(windows.map((w) => w.host))];
+    const stateCounts = new Array(8).fill(0);
+    windows.forEach((w) => { stateCounts[w.state] = (stateCounts[w.state] || 0) + 1; });
+    const attackWindows = windows.filter((w) => w.state > 0).length;
+    const benignWindows = windows.filter((w) => w.state === 0).length;
+    const threatRate = windows.length > 0 ? ((attackWindows / windows.length) * 100).toFixed(1) : '0.0';
+    const maxState = stateCounts.indexOf(Math.max(...stateCounts.filter((_, i) => i > 0)));
+    return { windows, hosts, stateCounts, attackWindows, benignWindows, threatRate, maxState };
+  }, [pcapAnalysis]);
 
   useEffect(() => {
     fetchMetrics().then((data) => {
@@ -56,6 +71,79 @@ export function ModelPerformance() {
           )}
         </div>
       )}
+
+      {pcapSummary && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2.5 rounded-lg border border-accent/40 bg-accent/5 p-4 text-xs text-fg">
+            <CheckCircle2Icon className="h-4 w-4 text-accent shrink-0" />
+            <span><strong>PCAP Source Active:</strong> Showing performance data derived from <span className="font-mono text-accent">{pcapAnalysis!.name}</span></span>
+            <Tag tone={pcapAnalysis!.synthetic ? 'synthetic' : 'real'} >{pcapAnalysis!.synthetic ? 'synthetic' : 'your PCAP'}</Tag>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-4">
+            <Panel title="Total windows">
+              <p className="font-mono text-3xl text-fg">{pcapSummary.windows.length}</p>
+              <p className="mt-1 text-xs text-muted">{pcapSummary.hosts.length} unique hosts</p>
+            </Panel>
+            <Panel title="Attack windows">
+              <p className="font-mono text-3xl text-crit">{pcapSummary.attackWindows}</p>
+              <p className="mt-1 text-xs text-muted">{pcapSummary.threatRate}% threat rate</p>
+            </Panel>
+            <Panel title="Benign windows">
+              <p className="font-mono text-3xl text-ok">{pcapSummary.benignWindows}</p>
+              <p className="mt-1 text-xs text-muted">clean traffic</p>
+            </Panel>
+            <Panel title="Dominant threat stage">
+              <p className="font-mono text-2xl" style={{ color: pcapSummary.maxState > 0 ? STATES[pcapSummary.maxState].color : 'var(--ok)' }}>
+                {pcapSummary.maxState > 0 ? STATES[pcapSummary.maxState].short : 'BEN'}
+              </p>
+              <p className="mt-1 text-xs text-muted">{pcapSummary.maxState > 0 ? STATES[pcapSummary.maxState].name : 'All benign'}</p>
+            </Panel>
+          </div>
+
+          <Panel title="Stage distribution from your PCAP" aside={<Tag tone={pcapAnalysis!.synthetic ? 'synthetic' : 'real'}>{pcapAnalysis!.name}</Tag>}>
+            <div className="overflow-x-auto">
+              <table className="w-full text-right font-mono text-xs">
+                <thead className="text-subtle">
+                  <tr>
+                    <th className="pb-2 text-left font-sans font-normal">Stage</th>
+                    <th className="pb-2 font-normal">Windows</th>
+                    <th className="pb-2 font-normal">%</th>
+                    <th className="pb-2 font-normal">Bar</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-line">
+                  {STATES.map((s, i) => {
+                    const count = pcapSummary.stateCounts[i] || 0;
+                    const pctVal = pcapSummary.windows.length > 0 ? (count / pcapSummary.windows.length) : 0;
+                    return (
+                      <tr key={s.id}>
+                        <td className="py-2 text-left font-sans">
+                          <span className="flex items-center gap-2 text-muted">
+                            <span className="h-2 w-2 rounded-sm shrink-0" style={{ backgroundColor: s.color }} aria-hidden />
+                            {s.name}
+                          </span>
+                        </td>
+                        <td className={`py-2 ${count === 0 ? 'text-subtle' : 'text-fg'}`}>{count}</td>
+                        <td className="py-2 text-subtle">{(pctVal * 100).toFixed(1)}%</td>
+                        <td className="py-2 pl-4 w-32">
+                          <div className="h-2 rounded-full bg-raised overflow-hidden">
+                            <div className="h-full rounded-full transition-all" style={{ width: `${(pctVal * 100).toFixed(1)}%`, backgroundColor: s.color }} />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </Panel>
+        </div>
+      )}
+
+      <div>
+        <h2 className="mb-3 text-sm font-semibold text-fg">Benchmark Evaluation {pcapSummary ? <span className="font-normal text-subtle">(CIC-IDS synthetic baseline)</span> : null}</h2>
+      </div>
 
       {status === 'running' &&
       <div role="status" className="flex items-center gap-3 rounded-lg border border-line bg-surface p-6 text-sm text-muted">
