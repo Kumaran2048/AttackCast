@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { MatrixGrid } from '../components/MatrixGrid';
 import { Panel } from '../components/Panel';
 import { Tag } from '../components/Tag';
@@ -13,15 +13,21 @@ const CONF_TONE = { high: 'neutral', medium: 'accent', heuristic: 'heuristic' } 
 
 export function DataStates() {
   const { analysis: pcapAnalysis } = usePcapAnalysis();
+  const [stats, setStats] = useState<{ counts: any[]; estimated: number[][] } | null>(null);
 
-  const stats = useMemo(() => {
-    const seqs = generateDataset(2026);
-    const counts = SPLITS.map((sp) => {
-      const c = new Array(8).fill(0);
-      toSamples(seqs.filter((s) => s.split === sp)).forEach((s) => c[s.y]++);
-      return { split: sp, seqs: seqs.filter((s) => s.split === sp).length, counts: c, total: c.reduce((a, v) => a + v, 0) };
-    });
-    return { counts, estimated: markov(seqs.filter((s) => s.split === 'train')).matrix };
+  useEffect(() => {
+    let active = true;
+    window.setTimeout(() => {
+      const seqs = generateDataset(2026);
+      const counts = SPLITS.map((sp) => {
+        const c = new Array(8).fill(0);
+        toSamples(seqs.filter((s) => s.split === sp)).forEach((s) => c[s.y]++);
+        return { split: sp, seqs: seqs.filter((s) => s.split === sp).length, counts: c, total: c.reduce((a, v) => a + v, 0) };
+      });
+      const estimated = markov(seqs.filter((s) => s.split === 'train')).matrix;
+      if (active) setStats({ counts, estimated });
+    }, 50);
+    return () => { active = false; };
   }, []);
 
   const pcapStats = useMemo(() => {
@@ -106,7 +112,11 @@ export function DataStates() {
           </Panel>
         ) : (
           <Panel title="Markov chain estimated from train" aside={<Tag tone="real">real benchmark · seed 2026</Tag>}>
-            <MatrixGrid matrix={stats.estimated} rowLabel="from" colLabel="to" />
+            {stats ? (
+              <MatrixGrid matrix={stats.estimated} rowLabel="from" colLabel="to" />
+            ) : (
+              <div className="flex h-32 items-center justify-center text-sm text-subtle">Computing baseline stats...</div>
+            )}
           </Panel>
         )}
       </div>
@@ -152,28 +162,30 @@ export function DataStates() {
           </Panel>
         ) : (
           <Panel title="Dataset stats · next-state targets" aside={<Tag tone="real">CICIDS-2017/2018 + CTU-13</Tag>}>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[480px] text-right font-mono text-xs">
-              <thead className="text-subtle">
-                <tr>
-                  <th className="pb-2 text-left font-sans font-normal">Split</th>
-                  {STATES.map((s) => <th key={s.id} className="pb-2 font-normal">{s.short}</th>)}
-                  <th className="pb-2 font-normal">Total</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {stats.counts.map((c) =>
-                <tr key={c.split}>
-                    <td className="py-2 text-left font-sans text-muted">{c.split} <span className="text-subtle">· {c.seqs} seq</span></td>
-                    {c.counts.map((v, i) => <td key={i} className={`py-2 ${v === 0 ? 'text-crit' : 'text-fg'}`}>{v}</td>)}
-                    <td className="py-2 text-fg">{c.total}</td>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[480px] text-right font-mono text-xs">
+                <thead className="text-subtle">
+                  <tr>
+                    <th className="pb-2 text-left font-sans font-normal">Split</th>
+                    {STATES.map((s) => <th key={s.id} className="pb-2 font-normal">{s.short}</th>)}
+                    <th className="pb-2 font-normal">Total</th>
                   </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-          <p className="mt-3 text-xs text-subtle">Split by whole sequence (scenario-held-out), no windows shared across splits. Zero counts show in red.</p>
-        </Panel>
+                </thead>
+                <tbody className="divide-y divide-line">
+                  {stats ? stats.counts.map((c) =>
+                  <tr key={c.split}>
+                      <td className="py-2 text-left font-sans text-muted">{c.split} <span className="text-subtle">· {c.seqs} seq</span></td>
+                      {c.counts.map((v: number, i: number) => <td key={i} className={`py-2 ${v === 0 ? 'text-crit' : 'text-fg'}`}>{v}</td>)}
+                      <td className="py-2 text-fg">{c.total}</td>
+                    </tr>
+                  ) : (
+                    <tr><td colSpan={10} className="py-8 text-center text-subtle">Loading stats...</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-3 text-xs text-subtle">Split by whole sequence (scenario-held-out), no windows shared across splits. Zero counts show in red.</p>
+          </Panel>
         )}
 
         <Panel title="Canonical column availability" aside={<span className="text-xs text-subtle">expected · verify in Phase 1</span>}>

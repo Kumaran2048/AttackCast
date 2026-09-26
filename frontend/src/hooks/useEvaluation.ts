@@ -7,14 +7,7 @@ type Status = 'running' | 'done' | 'error';
 let cache: EvalReport[] | null = null;
 
 function getInitialReports(): EvalReport[] {
-  if (cache) return cache;
-  try {
-    cache = EVAL_SEEDS.map((seed) => runEvaluation(seed));
-    return cache;
-  } catch (e) {
-    console.warn('Initial evaluation error:', e);
-    return [];
-  }
+  return cache || [];
 }
 
 export function useEvaluation() {
