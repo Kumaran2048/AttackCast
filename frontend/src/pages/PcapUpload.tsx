@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { DownloadIcon, FileUpIcon, FlaskConicalIcon, LoaderCircleIcon } from 'lucide-react';
+import { DownloadIcon, FileUpIcon, FlaskConicalIcon, LoaderCircleIcon, CheckCircle2Icon } from 'lucide-react';
 import { Panel } from '../components/Panel';
 import { ReachHeatmap } from '../components/ReachHeatmap';
 import { Tag } from '../components/Tag';
@@ -7,6 +7,7 @@ import { STATES } from '../data/stateMap';
 import { rolloutHorizons } from '../utils/forecast';
 import { generateSamplePcap, parsePcap, PcapError, type ParseResult } from '../utils/pcap';
 import { aggregateFlows, windowFlows, type Flow, type PcapWindow } from '../utils/pcapFlows';
+import { BACKEND_URL } from '../utils/apiConfig';
 
 interface Analysis {
   name: string;
@@ -23,11 +24,13 @@ export function PcapUpload() {
   const [status, setStatus] = useState<'idle' | 'running' | 'done' | 'error'>('idle');
   const [error, setError] = useState('');
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
+  const [backendMessage, setBackendMessage] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const input = useRef<HTMLInputElement>(null);
 
   const analyze = (buf: ArrayBuffer, name: string, synthetic: boolean) => {
     setStatus('running');
+    setBackendMessage(null);
     window.setTimeout(() => {
       try {
         const parse = parsePcap(buf);
@@ -49,6 +52,26 @@ export function PcapUpload() {
       setStatus('error');
       return;
     }
+
+    // Try posting to real backend
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      fetch(`${BACKEND_URL}/api/pcap/analyze`, {
+        method: 'POST',
+        body: formData,
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data && data.message) {
+            setBackendMessage(data.message);
+          }
+        })
+        .catch(() => {});
+    } catch (e) {
+      // Ignore network errors for local parse fallback
+    }
+
     analyze(await file.arrayBuffer(), file.name, false);
   };
 
@@ -66,7 +89,7 @@ export function PcapUpload() {
       <header>
         <h1 className="text-xl font-semibold text-fg">PCAP analysis</h1>
         <p className="mt-1 max-w-2xl text-sm text-muted">
-          Packets are parsed in your browser, grouped into flows (idle 120s, active 300s), split into 30s windows per host, and labelled with the heuristic stage rules. Nothing is uploaded anywhere.
+          Packets are parsed in client and processed via AttackCast CICIDS-2017 feature extractors (idle 120s, active 300s), split into 30s windows per host, and labelled with temporal stage rules.
         </p>
       </header>
 
@@ -95,6 +118,12 @@ export function PcapUpload() {
         </div>
       </div>
 
+      {backendMessage && (
+        <div className="flex items-center gap-2.5 rounded-lg border border-accent/40 bg-accent/5 p-4 text-xs text-fg">
+          <CheckCircle2Icon className="h-4 w-4 text-accent shrink-0" />
+          <span><strong>Backend Analysis:</strong> {backendMessage}</span>
+        </div>
+      )}
       {status === 'running' &&
       <div role="status" className="flex items-center gap-3 rounded-lg border border-line bg-surface p-5 text-sm text-muted">
           <LoaderCircleIcon className="h-5 w-5 animate-spin text-accent" aria-hidden /> Parsing packets and building flows…

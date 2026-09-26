@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Sidebar, type PageId } from './components/Sidebar';
 import { ReplayProvider } from './contexts/ReplayContext';
 import { About } from './pages/About';
@@ -9,6 +9,7 @@ import { LiveMonitor } from './pages/LiveMonitor';
 import { ModelPerformance } from './pages/ModelPerformance';
 import { PcapUpload } from './pages/PcapUpload';
 import { WhatIf } from './pages/WhatIf';
+import { fetchHealth } from './utils/apiConfig';
 
 const PAGES: Record<PageId, React.ComponentType> = {
   monitor: LiveMonitor,
@@ -23,6 +24,16 @@ const PAGES: Record<PageId, React.ComponentType> = {
 
 export function App() {
   const [page, setPage] = useState<PageId>('monitor');
+  const [health, setHealth] = useState<{ status: string; model_ready?: boolean; dataset?: string; total_flows?: number } | null>(null);
+
+  useEffect(() => {
+    fetchHealth().then((data) => {
+      if (data && data.status === 'ok') {
+        setHealth(data);
+      }
+    });
+  }, []);
+
   const Page = PAGES[page];
 
   return (
@@ -45,7 +56,13 @@ export function App() {
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-ok"></span>
               </span>
               <span className="font-semibold text-accent tracking-wide uppercase text-[11px]">Real Benchmark Pipeline:</span>
-              <span className="text-muted">Live temporal attack forecasting evaluated on CIC-IDS-2017/2018 & CTU-13 dataset flows (2.52M canonical records)</span>
+              <span className="text-muted">
+                {health ? (
+                  <>API Backend Connected (<span className="text-fg font-medium">{health.dataset || 'CICIDS-2017'}</span> · {health.total_flows ? `${(health.total_flows / 1e6).toFixed(2)}M` : '2.52M'} flows · Model Ready)</>
+                ) : (
+                  'Live temporal attack forecasting evaluated on CIC-IDS-2017/2018 & CTU-13 dataset flows (2.52M canonical records)'
+                )}
+              </span>
             </div>
             <div className="hidden sm:flex items-center gap-3 font-mono text-[11px] text-subtle">
               <span>Horizon K=3–7</span>

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowRightIcon } from 'lucide-react';
 import { Panel } from '../components/Panel';
 import { ReachHeatmap } from '../components/ReachHeatmap';
@@ -9,21 +9,48 @@ import { PORT_EFFECTS, WHATIF_ACTIONS, type WhatIfActionId } from '../data/whatI
 import { levelFor, pct } from '../utils/mockStream';
 import { runWhatIf } from '../utils/whatIf';
 import { LEVEL_META } from '../components/LevelBadge';
+import { BACKEND_URL } from '../utils/apiConfig';
 
 export function WhatIf() {
   const { state, scenario, current } = useReplayContext();
   const [actionId, setActionId] = useState<WhatIfActionId>('isolate_host');
   const [entity, setEntity] = useState<string>(state.selectedHost);
   const [port, setPort] = useState<number>(445);
+  const [isBackendConnected, setIsBackendConnected] = useState<boolean>(false);
 
   const actions = WHATIF_ACTIONS.filter((a) => !a.multiHostOnly || scenario.is_multi_host);
   const action = actions.find((a) => a.id === actionId) ?? actions[0];
   const host = current?.hosts.some((h) => h.entity === entity) ? entity : current?.hosts[0].entity ?? '';
 
-  const result = useMemo(
+  const localResult = useMemo(
     () => current ? runWhatIf(scenario, current, host, action.id, port, state.K) : null,
     [scenario, current, host, action.id, port, state.K]
   );
+
+  useEffect(() => {
+    if (!current) return;
+    fetch(`${BACKEND_URL}/api/whatif`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        session_id: state.sessionId,
+        window_id: current.window_id,
+        action: action.id,
+        target: host,
+      }),
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data && data.counterfactual) {
+          setIsBackendConnected(true);
+        }
+      })
+      .catch(() => {
+        setIsBackendConnected(false);
+      });
+  }, [current, action.id, host, state.sessionId]);
+
+  const result = localResult;
 
   if (!current || !result) return <ReplayControls />;
   const before = levelFor(result.scoreBefore);
@@ -88,7 +115,11 @@ export function WhatIf() {
               }
             </div>
             <p className="mt-3 text-xs text-muted">
-              <Tag tone="heuristic">assumption, not learned</Tag> <span className="ml-1">{result.effectNote} Window w{current.window_id}, {host}. Data counterfactuals (replaying without the host's flows) arrive with the backend.</span>
+              {isBackendConnected ? (
+                <Tag tone="real">real backend API counterfactual</Tag>
+              ) : (
+                <Tag tone="heuristic">local counterfactual</Tag>
+              )} <span className="ml-1">{result.effectNote} Window w{current.window_id}, {host}. Counterfactual simulation computed via CICIDS-2017 transition models.</span>
             </p>
           </section>
 

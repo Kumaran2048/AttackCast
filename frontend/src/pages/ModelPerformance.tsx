@@ -1,5 +1,5 @@
-import React from 'react';
-import { LoaderCircleIcon, RefreshCwIcon } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { CheckCircle2Icon, LoaderCircleIcon, RefreshCwIcon } from 'lucide-react';
 import { BaselineTable } from '../components/BaselineTable';
 import { MatrixGrid } from '../components/MatrixGrid';
 import { Panel } from '../components/Panel';
@@ -10,9 +10,19 @@ import { useEvaluation } from '../hooks/useEvaluation';
 import { EVAL_SEEDS, type EvalReport } from '../utils/evaluation';
 import { meanStd } from '../utils/metrics';
 import { pct } from '../utils/mockStream';
+import { fetchMetrics } from '../utils/apiConfig';
 
 export function ModelPerformance() {
   const { status, reports, progress, total, error, run } = useEvaluation();
+  const [backendMetrics, setBackendMetrics] = useState<any>(null);
+
+  useEffect(() => {
+    fetchMetrics().then((data) => {
+      if (data && data.status !== 'not-generated') {
+        setBackendMetrics(data);
+      }
+    });
+  }, []);
 
   return (
     <div className="space-y-5">
@@ -32,6 +42,20 @@ export function ModelPerformance() {
           <RefreshCwIcon className="h-4 w-4" aria-hidden /> Re-run evaluation
         </button>
       </header>
+
+      {backendMetrics && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-accent/40 bg-accent/5 p-4 text-xs text-fg">
+          <div className="flex items-center gap-2.5">
+            <CheckCircle2Icon className="h-4 w-4 text-accent shrink-0" />
+            <span>
+              <strong>Backend Metrics Active ({backendMetrics.dataset || 'CICIDS-2017'}):</strong> {backendMetrics.n_test_samples?.toLocaleString()} held-out test samples evaluated on FastAPI server.
+            </span>
+          </div>
+          {backendMetrics.models?.gru_world_model?.macro_f1 && (
+            <span className="font-mono text-accent">GRU Macro F1: {backendMetrics.models.gru_world_model.macro_f1}</span>
+          )}
+        </div>
+      )}
 
       {status === 'running' &&
       <div role="status" className="flex items-center gap-3 rounded-lg border border-line bg-surface p-6 text-sm text-muted">

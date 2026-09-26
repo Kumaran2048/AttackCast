@@ -19,16 +19,17 @@ export interface ReplayState {
 }
 
 export type ReplayAction =
-{type: 'tick';} |
-{type: 'play';} |
-{type: 'pause';} |
-{type: 'speed';speed: number;} |
-{type: 'k';K: number;} |
-{type: 'seek';position: number;} |
-{type: 'scenario';id: string;} |
-{type: 'reset';} |
-{type: 'select-host';entity: string;} |
-{type: 'feedback';windowId: number;host: string;action: FeedbackAction;};
+  | { type: 'tick' }
+  | { type: 'play' }
+  | { type: 'pause' }
+  | { type: 'speed'; speed: number }
+  | { type: 'k'; K: number }
+  | { type: 'seek'; position: number }
+  | { type: 'scenario'; id: string }
+  | { type: 'reset' }
+  | { type: 'select-host'; entity: string }
+  | { type: 'feedback'; windowId: number; host: string; action: FeedbackAction }
+  | { type: 'push-update'; update: WindowUpdate };
 
 export function resolutionKey(windowId: number, host: string): string {
   return `${windowId}|${host}`;
@@ -139,6 +140,11 @@ export function replayReducer(state: ReplayState, action: ReplayAction): ReplayS
           resolutions: { ...state.resolutions, [resolutionKey(action.windowId, action.host)]: action.action }
         };
       }
+    case 'push-update': {
+      const updates = [...state.updates, action.update];
+      const done = updates.length >= getScenario(state.scenarioId).windows;
+      return { ...state, updates, playing: state.playing && !done };
+    }
     default:
       return state;
   }
