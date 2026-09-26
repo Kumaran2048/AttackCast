@@ -10,7 +10,8 @@ export function HostTabs() {
     <div role="tablist" aria-label="Hosts" className="flex flex-wrap gap-1.5">
       {current.hosts.map((h) => {
         const active = h.entity === state.selectedHost;
-        const m = LEVEL_META[h.alert.adjusted_level];
+        const level = h.alert?.adjusted_level || 'none';
+        const m = LEVEL_META[level] || LEVEL_META.none;
         return (
           <button
             key={h.entity}

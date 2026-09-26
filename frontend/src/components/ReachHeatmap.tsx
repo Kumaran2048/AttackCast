@@ -6,8 +6,19 @@ function alphaHex(p: number): string {
   return Math.round(Math.max(0.04, p) * 255).toString(16).padStart(2, '0');
 }
 
+function getProb(probs: any, s: { id: number; name: string }): number {
+  if (!probs) return 0;
+  if (Array.isArray(probs)) return typeof probs[s.id] === 'number' ? probs[s.id] : 0;
+  if (typeof probs === 'object') {
+    if (typeof probs[s.name] === 'number') return probs[s.name];
+    if (typeof probs[s.id] === 'number') return probs[s.id];
+  }
+  return 0;
+}
+
 /** Stages × horizons grid of P(reach stage within k windows). */
 export function ReachHeatmap({ horizons, compact = false }: {horizons: Horizon[];compact?: boolean;}) {
+  const list = horizons || [];
   const rows = STATES.filter((s) => s.id !== 0);
   return (
     <div className="overflow-x-auto">
@@ -15,7 +26,7 @@ export function ReachHeatmap({ horizons, compact = false }: {horizons: Horizon[]
         <thead>
           <tr>
             <th className={`${compact ? 'w-32' : 'w-44'} text-left text-xs font-normal text-subtle`}>Stage</th>
-            {horizons.map((h) =>
+            {list.map((h) =>
             <th key={h.k} scope="col" className="text-center font-mono text-xs font-normal text-subtle">k={h.k}</th>
             )}
           </tr>
@@ -27,8 +38,8 @@ export function ReachHeatmap({ horizons, compact = false }: {horizons: Horizon[]
                 <span className="text-fg">{compact ? s.short : s.name}</span>
                 {!compact && <span className="ml-1.5 font-mono text-[10px] text-subtle">{s.attackId}</span>}
               </th>
-              {horizons.map((h) => {
-              const p = h.reach_probs[s.id];
+              {list.map((h) => {
+              const p = getProb(h.reach_probs, s);
               return (
                 <td
                   key={h.k}

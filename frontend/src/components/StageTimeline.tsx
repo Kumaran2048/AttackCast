@@ -3,6 +3,15 @@ import { useReplayContext } from '../contexts/ReplayContext';
 import { STATES } from '../data/stateMap';
 import { Panel } from './Panel';
 
+function findState(s: any) {
+  if (typeof s === 'number' && STATES[s]) return STATES[s];
+  if (typeof s === 'string') {
+    const found = STATES.find((st) => st.name === s || st.short === s || st.attackId === s);
+    if (found) return found;
+  }
+  return STATES[0];
+}
+
 export function StageTimeline({ entity }: {entity: string;}) {
   const { state, dispatch, scenario } = useReplayContext();
   const cells = Array.from({ length: scenario.windows }, (_, i) => {
@@ -17,15 +26,16 @@ export function StageTimeline({ entity }: {entity: string;}) {
       <div className="grid flex-1 gap-px" style={{ gridTemplateColumns: `repeat(${scenario.windows}, minmax(0, 1fr))` }}>
         {cells.map((c, i) => {
         const s = c[key];
+        const st = s !== undefined && s !== null ? findState(s) : null;
         return (
           <button
             key={i}
             type="button"
             onClick={() => dispatch({ type: 'seek', position: i + 1 })}
-            aria-label={`Window ${i}: ${s !== undefined ? STATES[s].name : 'not yet played'}`}
-            title={s !== undefined ? `w${i} · ${STATES[s].name}` : `w${i}`}
+            aria-label={`Window ${i}: ${st ? st.name : 'not yet played'}`}
+            title={st ? `w${i} · ${st.name}` : `w${i}`}
             className={`h-6 rounded-sm ${i === cursor ? 'ring-2 ring-fg/80 ring-offset-1 ring-offset-surface' : ''}`}
-            style={{ backgroundColor: s !== undefined ? STATES[s].color : 'rgb(var(--raised))' }} />);
+            style={{ backgroundColor: st ? st.color : 'rgb(var(--raised))' }} />);
 
 
       })}

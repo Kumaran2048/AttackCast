@@ -17,14 +17,16 @@ export function CampaignView() {
   const graph = useMemo(() => (current ? buildHostGraph(scenario, current) : { nodes: [], edges: [] }), [scenario, current]);
   const riskHistory = useMemo(() => state.updates.map((u) => u.campaign?.risk_score ?? u.hosts[0]?.alert.adjusted_score ?? 0), [state.updates]);
 
-  const host = current?.hosts[0];
+  const host = current?.hosts?.[0];
   const isMulti = scenario.is_multi_host && campaign;
-  const riskScore = isMulti ? campaign.risk_score : host?.alert.adjusted_score ?? 0.05;
+  const riskScore = isMulti ? campaign.risk_score ?? 0.05 : host?.alert?.adjusted_score ?? 0.05;
   const level = levelFor(riskScore);
-  const m = LEVEL_META[level];
+  const m = LEVEL_META[level] || LEVEL_META.none;
+  const memberScores = campaign?.member_scores || [];
+  const memberHosts = campaign?.member_hosts || (host ? [host.entity] : []);
   const soloAlerts = isMulti
-    ? campaign.member_scores.filter((s) => s.solo >= ALERT_THRESHOLDS.watch).length
-    : host && host.alert.base_score >= ALERT_THRESHOLDS.watch
+    ? memberScores.filter((s) => s.solo >= ALERT_THRESHOLDS.watch).length
+    : host && (host.alert?.base_score ?? 0) >= ALERT_THRESHOLDS.watch
     ? 1
     : 0;
 
@@ -37,6 +39,10 @@ export function CampaignView() {
     );
   }
 
+  const forecastHorizons = isMulti
+    ? (campaign?.forecast?.horizons || [])
+    : (host?.forecast?.horizons || []);
+
   return (
     <div className="space-y-5">
       <ReplayControls />
@@ -46,7 +52,7 @@ export function CampaignView() {
           className="min-w-0 xl:col-span-7"
           aside={<Tag tone="accent">network topology</Tag>}>
           
-          <HostGraph nodes={graph.nodes} edges={graph.edges} />
+          <HostGraph nodes={graph.nodes || []} edges={graph.edges || []} />
           <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted">
             <span className="flex items-center gap-1.5"><span className="h-0.5 w-5 bg-crit" aria-hidden /> shared-target edge</span>
             <span className="flex items-center gap-1.5"><span className="h-0.5 w-5 bg-line" aria-hidden /> other traffic</span>
@@ -61,21 +67,21 @@ export function CampaignView() {
                 <p className="text-xs text-muted">{isMulti ? 'Campaign risk' : 'Host risk score'}</p>
                 <p className={`mt-1 font-mono text-4xl font-medium ${m.text}`}>{pct(riskScore)}</p>
                 <p className={`mt-1 flex items-center gap-1.5 text-sm ${m.text}`}>
-                  <m.Icon className="h-4 w-4" aria-hidden /> {level === 'none' ? 'Normal Baseline' : `${m.label} · ${isMulti ? 'coordinated campaign' : host?.current_state.name}`}
+                  <m.Icon className="h-4 w-4" aria-hidden /> {level === 'none' ? 'Normal Baseline' : `${m.label} · ${isMulti ? 'coordinated campaign' : host?.current_state?.name || 'active'}`}
                 </p>
               </div>
               <div className="text-right">
                 <p className="font-mono text-4xl font-medium text-fg">
                   {soloAlerts}
-                  <span className="text-subtle">/{isMulti ? campaign.member_hosts.length : 1}</span>
+                  <span className="text-subtle">/{isMulti ? memberHosts.length : 1}</span>
                 </p>
                 <p className="text-xs text-muted">{isMulti ? 'hosts alerting alone' : 'monitored host'}</p>
               </div>
             </div>
             <p className="mt-4 text-sm leading-relaxed text-fg">
               {isMulti
-                ? campaign.explanation.text
-                : host?.explanation.text ?? 'Monitoring single host interaction and topology flows.'}
+                ? (campaign?.explanation?.text || 'Correlated network activity detected across campaign hosts.')
+                : (host?.explanation?.text ?? 'Monitoring single host interaction and topology flows.')}
             </p>
             <div className="mt-4">
               <Sparkline series={[{ values: riskHistory, className: 'stroke-crit', label: 'risk over time' }]} />
@@ -83,10 +89,10 @@ export function CampaignView() {
             </div>
           </section>
 
-          <Panel title={`P(${isMulti ? 'campaign confirmed' : 'impact reach'}) · next ${isMulti ? campaign.forecast.horizons.length : host?.forecast.horizons.length ?? 5} windows`}>
+          <Panel title={`P(${isMulti ? 'campaign confirmed' : 'impact reach'}) · next ${forecastHorizons.length || 5} windows`}>
             <div className="flex items-end gap-2">
-              {(isMulti ? campaign.forecast.horizons : host?.forecast.horizons ?? []).map((h: any) => {
-                const prob = isMulti ? h.reach_prob_confirmed : h.reach_probs ? h.reach_probs[7] ?? 0.2 : 0.1;
+              {forecastHorizons.map((h: any) => {
+                const prob = isMulti ? (h.reach_prob_confirmed ?? 0.5) : h.reach_probs ? (Array.isArray(h.reach_probs) ? (h.reach_probs[7] ?? 0.2) : (h.reach_probs['Impact'] ?? 0.2)) : 0.1;
                 return (
                   <div key={h.k} className="flex flex-1 flex-col items-center gap-1">
                     <span className="font-mono text-[11px] text-fg">{Math.round(prob * 100)}</span>

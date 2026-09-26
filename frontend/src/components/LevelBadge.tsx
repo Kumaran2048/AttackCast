@@ -39,10 +39,8 @@ export const LEVEL_META: Record<AlertLevel, {
 };
 export function LevelBadge({
   level
-
-
 }: {level: AlertLevel;}) {
-  const m = LEVEL_META[level];
+  const m = LEVEL_META[level] || LEVEL_META.none;
   return <span className={`inline-flex items-center gap-1 text-xs font-medium ${m.text}`}>
       <m.Icon className="h-3.5 w-3.5" aria-hidden />
       {m.label}

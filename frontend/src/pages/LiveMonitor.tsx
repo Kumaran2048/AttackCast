@@ -12,8 +12,9 @@ import { useReplayContext } from '../contexts/ReplayContext';
 
 export function LiveMonitor() {
   const { state, current } = useReplayContext();
-  if (!current) return <ReplayControls />;
+  if (!current || !current.hosts || !current.hosts.length) return <ReplayControls />;
   const host = current.hosts.find((h) => h.entity === state.selectedHost) ?? current.hosts[0];
+  if (!host) return <ReplayControls />;
 
   return (
     <div className="space-y-5">

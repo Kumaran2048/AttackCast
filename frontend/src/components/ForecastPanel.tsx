@@ -6,8 +6,17 @@ import { Panel } from './Panel';
 import { ReachHeatmap } from './ReachHeatmap';
 import { Tag } from './Tag';
 
+function findState(s: any) {
+  if (typeof s === 'number' && STATES[s]) return STATES[s];
+  if (typeof s === 'string') {
+    const found = STATES.find((st) => st.name === s || st.short === s || st.attackId === s);
+    if (found) return found;
+  }
+  return STATES[0];
+}
+
 export function ForecastPanel({ host }: {host: HostUpdate;}) {
-  const { forecast } = host;
+  const forecast = host?.forecast || { K: 5, horizons: [], top_paths: [], uncertain: false, temperature: 1 };
 
   return (
     <Panel
@@ -20,22 +29,25 @@ export function ForecastPanel({ host }: {host: HostUpdate;}) {
       }>
       
       <p className="mb-3 text-xs text-muted">Probability the host reaches each stage within k windows (k × 30s ahead).</p>
-      <ReachHeatmap horizons={forecast.horizons} />
+      <ReachHeatmap horizons={forecast.horizons || []} />
 
       <div className="mt-5 border-t border-line pt-4">
-        <h3 className="mb-2 text-xs text-muted">Most likely paths from {host.current_state.name}</h3>
+        <h3 className="mb-2 text-xs text-muted">Most likely paths from {host.current_state?.name || 'Current Stage'}</h3>
         <ol className="space-y-2">
-          {forecast.top_paths.map((p, i) =>
+          {(forecast.top_paths || []).map((p, i) =>
           <li key={i} className="flex flex-wrap items-center gap-1">
-              {p.states.map((s, j) =>
-            <React.Fragment key={j}>
+              {(p.states || []).map((s, j) => {
+              const st = findState(s);
+              return (
+                <React.Fragment key={j}>
                   {j > 0 && <ChevronRightIcon className="h-3 w-3 text-subtle" aria-hidden />}
-                  <span className="rounded px-1.5 py-0.5 font-mono text-[11px] text-fg" style={{ backgroundColor: `${STATES[s].color}55` }}>
-                    {STATES[s].short}
+                  <span className="rounded px-1.5 py-0.5 font-mono text-[11px] text-fg" style={{ backgroundColor: `${st.color}55` }}>
+                    {st.short}
                   </span>
-                </React.Fragment>
-            )}
-              <span className="ml-2 font-mono text-xs text-muted">p={p.prob.toFixed(3)}</span>
+                </React.Fragment>);
+
+            })}
+              <span className="ml-2 font-mono text-xs text-muted">p={(p.prob || p.probability || 0).toFixed(3)}</span>
             </li>
           )}
         </ol>

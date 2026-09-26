@@ -8,9 +8,10 @@ import { LEVEL_META } from './LevelBadge';
 
 export function AlertCard({ host, windowId }: {host: HostUpdate;windowId: number;}) {
   const { state, dispatch } = useReplayContext();
-  const { alert, current_state } = host;
-  const m = LEVEL_META[alert.adjusted_level];
-  const resolved = state.resolutions[resolutionKey(windowId, host.entity)];
+  const alert = host?.alert || { adjusted_level: 'none', base_level: 'none', adjusted_score: 0, base_score: 0, reason: 'No active alert', lead_estimate_windows: null, feedback_adjusted: false };
+  const current_state = host?.current_state || { name: 'Benign', attack_id: '' };
+  const m = LEVEL_META[alert.adjusted_level] || LEVEL_META.none;
+  const resolved = state.resolutions[resolutionKey(windowId, host?.entity || '')];
   const actionable = alert.adjusted_level !== 'none' || alert.base_level !== 'none';
 
   const send = (action: 'confirm' | 'dismiss') => dispatch({ type: 'feedback', windowId, host: host.entity, action });
@@ -23,21 +24,21 @@ export function AlertCard({ host, windowId }: {host: HostUpdate;windowId: number
             <m.Icon className={`h-6 w-6 ${m.text}`} aria-hidden />
             <div>
               <p className={`text-lg font-semibold leading-tight ${m.text}`}>{m.label}</p>
-              <p className="font-mono text-xs text-muted">w{windowId} · {host.entity}</p>
+              <p className="font-mono text-xs text-muted">w{windowId} · {host?.entity || 'host'}</p>
             </div>
           </div>
           <div className="text-right">
-            <p className="font-mono text-2xl font-medium text-fg">{pct(alert.adjusted_score)}</p>
+            <p className="font-mono text-2xl font-medium text-fg">{pct(alert.adjusted_score || 0)}</p>
             <p className="text-[11px] text-subtle">forward risk</p>
           </div>
         </div>
 
         <dl className="mt-4 space-y-1.5 text-xs">
-          <Row label="Current stage" value={`${current_state.name} · ${current_state.attack_id}`} />
-          <Row label="Driver" value={alert.reason} />
+          <Row label="Current stage" value={`${current_state.name || 'Benign'}${current_state.attack_id ? ` · ${current_state.attack_id}` : ''}`} />
+          <Row label="Driver" value={alert.reason || 'Normal traffic baseline'} />
           <Row label="Lead estimate" value={alert.lead_estimate_windows ? `~${alert.lead_estimate_windows} windows (${alert.lead_estimate_windows * 30}s)` : '—'} />
           {alert.feedback_adjusted &&
-          <Row label="Feedback" value={`${pct(alert.base_score)} → ${pct(alert.adjusted_score)} (base ${LEVEL_META[alert.base_level].label.toLowerCase()})`} highlight />
+          <Row label="Feedback" value={`${pct(alert.base_score || 0)} → ${pct(alert.adjusted_score || 0)} (base ${(LEVEL_META[alert.base_level] || LEVEL_META.none).label.toLowerCase()})`} highlight />
           }
         </dl>
       </div>

@@ -9,9 +9,10 @@ function fmtBytes(b: number): string {
 }
 
 export function FlaggedFlows({ flows }: {flows: FlaggedFlow[];}) {
+  const list = flows || [];
   return (
-    <Panel title="Flagged flows" aside={<span className="font-mono text-xs text-subtle">{flows.length} linked</span>}>
-      {flows.length === 0 ?
+    <Panel title="Flagged flows" aside={<span className="font-mono text-xs text-subtle">{list.length} linked</span>}>
+      {list.length === 0 ?
       <p className="text-sm text-muted">No flows flagged in this window.</p> :
 
       <div className="overflow-x-auto">
@@ -27,14 +28,14 @@ export function FlaggedFlows({ flows }: {flows: FlaggedFlow[];}) {
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
-              {flows.map((f) =>
-            <tr key={f.flow_id} className="text-fg">
-                  <td className="py-1.5 text-muted">{f.flow_id}</td>
-                  <td className="py-1.5">{f.src_ip}</td>
-                  <td className="py-1.5">{f.dst_ip}:{f.dst_port}</td>
-                  <td className="py-1.5 text-muted">{f.proto}</td>
-                  <td className="py-1.5 text-right">{f.pkts}</td>
-                  <td className="py-1.5 text-right">{fmtBytes(f.bytes)}</td>
+              {list.map((f, i) =>
+            <tr key={f.flow_id || i} className="text-fg">
+                  <td className="py-1.5 text-muted">{f.flow_id || `flow-${i}`}</td>
+                  <td className="py-1.5">{f.src_ip || '—'}</td>
+                  <td className="py-1.5">{f.dst_ip ? `${f.dst_ip}:${f.dst_port || 0}` : '—'}</td>
+                  <td className="py-1.5 text-muted">{f.proto || 'TCP'}</td>
+                  <td className="py-1.5 text-right">{f.pkts || 0}</td>
+                  <td className="py-1.5 text-right">{fmtBytes(f.bytes || 0)}</td>
                 </tr>
             )}
             </tbody>
