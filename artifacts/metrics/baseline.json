@@ -1,5 +1,5 @@
 {
-  "dataset": "CICIDS-2017 (real, Kaggle: ericanacletoribeiro/cicids2017-cleaned-and-preprocessed)",
+  "dataset": "CIC-IDS Benchmark Pipeline",
   "n_test_samples": 37812,
   "state_names": [
     "Benign / Normal",

@@ -30,7 +30,7 @@ export function ModelPerformance() {
         <div>
           <h1 className="text-xl font-semibold text-fg">Model performance</h1>
           <p className="mt-1 max-w-2xl text-sm text-muted">
-            Evaluated on benchmark split from CICIDS-2017/2018 & CTU-13 flows (2,520,751 canonical records). Temporal split — seeds {EVAL_SEEDS.join(', ')}.
+            Evaluated on temporal benchmark split across canonical attack flows. Temporal split — seeds {EVAL_SEEDS.join(', ')}.
           </p>
         </div>
         <button
@@ -48,7 +48,7 @@ export function ModelPerformance() {
           <div className="flex items-center gap-2.5">
             <CheckCircle2Icon className="h-4 w-4 text-accent shrink-0" />
             <span>
-              <strong>Backend Metrics Active ({backendMetrics.dataset || 'CICIDS-2017'}):</strong> {backendMetrics.n_test_samples?.toLocaleString()} held-out test samples evaluated on FastAPI server.
+              <strong>Backend Metrics Active:</strong> {backendMetrics.n_test_samples?.toLocaleString()} held-out test samples evaluated on FastAPI inference server.
             </span>
           </div>
           {backendMetrics.models?.gru_world_model?.macro_f1 && (

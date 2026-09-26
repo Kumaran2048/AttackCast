@@ -56,9 +56,9 @@ export function App() {
               <span className="font-semibold text-accent tracking-wide uppercase text-[11px]">Real-Time Attack Forecasting:</span>
               <span className="text-muted">
                 {health ? (
-                  <>API Backend Active (<span className="text-fg font-medium">{health.dataset || 'CIC-IDS Benchmark'}</span> · Model Ready)</>
+                  <>API Backend Active · <span className="text-fg font-medium">Calibrated GRU World Model Ready</span></>
                 ) : (
-                  'Live temporal multi-step forecasting engine evaluated on benchmark split'
+                  'Live temporal multi-step forecasting engine'
                 )}
               </span>
             </div>
