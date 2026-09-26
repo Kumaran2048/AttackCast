@@ -89,7 +89,7 @@ function dot(a: number[], b: number[]): number {
 }
 
 /** GRU World Model with Temporal Self-Attention (No Graph) */
-export function trainGRUWorldModel(train: Sample[], epochs = 180, lr = 0.5, l2 = 1e-4): SoftmaxClassifier {
+export function trainGRUWorldModel(train: Sample[], epochs = 12, lr = 0.5, l2 = 1e-4): SoftmaxClassifier {
   const D = train[0].x.length;
   const H = 16;
 
@@ -161,7 +161,7 @@ export function trainGRUWorldModel(train: Sample[], epochs = 180, lr = 0.5, l2 =
 }
 
 /** Spatio-Temporal Graph Attention World Model (With GNN Graph Layer) */
-export function trainGNNWorldModel(train: Sample[], epochs = 180, lr = 0.5, l2 = 1e-4): SoftmaxClassifier {
+export function trainGNNWorldModel(train: Sample[], epochs = 12, lr = 0.5, l2 = 1e-4): SoftmaxClassifier {
   const gru = trainGRUWorldModel(train, epochs, lr, l2);
   
   const logits = (s: Sample) => {

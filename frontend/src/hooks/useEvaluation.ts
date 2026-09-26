@@ -6,10 +6,22 @@ type Status = 'running' | 'done' | 'error';
 // Evaluation state lives at module level so switching pages doesn't recompute.
 let cache: EvalReport[] | null = null;
 
+function getInitialReports(): EvalReport[] {
+  if (cache) return cache;
+  try {
+    cache = EVAL_SEEDS.map((seed) => runEvaluation(seed));
+    return cache;
+  } catch (e) {
+    console.warn('Initial evaluation error:', e);
+    return [];
+  }
+}
+
 export function useEvaluation() {
-  const [status, setStatus] = useState<Status>(cache ? 'done' : 'running');
-  const [reports, setReports] = useState<EvalReport[]>(cache ?? []);
-  const [progress, setProgress] = useState(cache ? EVAL_SEEDS.length : 0);
+  const initial = getInitialReports();
+  const [status, setStatus] = useState<Status>(initial.length > 0 ? 'done' : 'running');
+  const [reports, setReports] = useState<EvalReport[]>(initial);
+  const [progress, setProgress] = useState(initial.length);
   const [error, setError] = useState<string | null>(null);
 
   const run = useCallback(() => {
@@ -17,7 +29,6 @@ export function useEvaluation() {
     setProgress(0);
     setError(null);
     const out: EvalReport[] = [];
-    // Yield between seeds so the loading state paints.
     const next = (i: number) => {
       if (i >= EVAL_SEEDS.length) {
         cache = out;
@@ -34,14 +45,14 @@ export function useEvaluation() {
           setError(e instanceof Error ? e.message : 'Evaluation failed');
           setStatus('error');
         }
-      }, 30);
+      }, 10);
     };
     next(0);
   }, []);
 
   useEffect(() => {
-    if (!cache) run();
-  }, [run]);
+    if (!cache && reports.length === 0) run();
+  }, [reports.length, run]);
 
   return { status, reports, progress, total: EVAL_SEEDS.length, error, run };
 }
