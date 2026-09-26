@@ -79,7 +79,7 @@ function appendWindow(state: ReplayState): ReplayState {
   return { ...state, updates, playing: state.playing && updates.length < sc.windows };
 }
 
-export function newSession(scenarioId: string, seq: number, K = 5, speed = 2, prevSelectedHost?: string): ReplayState {
+export function newSession(scenarioId: string, seq: number, K = 5, speed = 2): ReplayState {
   const sc = getScenario(scenarioId);
   const base: ReplayState = {
     sessionSeq: seq,
@@ -92,7 +92,7 @@ export function newSession(scenarioId: string, seq: number, K = 5, speed = 2, pr
     feedback: {},
     events: [],
     resolutions: {},
-    selectedHost: prevSelectedHost && sc.hosts.some((h) => h.entity === prevSelectedHost) ? prevSelectedHost : sc.hosts[0].entity
+    selectedHost: sc.hosts[0].entity
   };
   return appendWindow(base);
 }
@@ -115,7 +115,7 @@ export function replayReducer(state: ReplayState, action: ReplayAction): ReplayS
     case 'select-host':
       return { ...state, selectedHost: action.entity };
     case 'scenario':
-      return newSession(action.id, state.sessionSeq + 1, state.K, state.speed, state.selectedHost);
+      return newSession(action.id, state.sessionSeq + 1, state.K, state.speed);
     case 'reset': {
       if (state.customScenario && state.scenarioId === state.customScenario.id && state.customUpdates) {
         return {
@@ -127,7 +127,8 @@ export function replayReducer(state: ReplayState, action: ReplayAction): ReplayS
           resolutions: {},
         };
       }
-      return newSession(state.scenarioId, state.sessionSeq + 1, state.K, state.speed, state.selectedHost);
+      const resetState = newSession(state.scenarioId, state.sessionSeq + 1, state.K, state.speed);
+      return { ...resetState, selectedHost: state.selectedHost };
     }
     case 'seek': {
       const sc = (state.customScenario && state.scenarioId === state.customScenario.id) ? state.customScenario : getScenario(state.scenarioId);
