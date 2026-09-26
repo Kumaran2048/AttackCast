@@ -26,14 +26,16 @@ export function StageTimeline({ entity }: {entity: string;}) {
       <div className="grid flex-1 gap-px" style={{ gridTemplateColumns: `repeat(${scenario.windows}, minmax(0, 1fr))` }}>
         {cells.map((c, i) => {
         const s = c[key];
-        const st = s !== undefined && s !== null ? findState(s) : null;
+        let st = s !== undefined && s !== null ? findState(s) : null;
+        if (!st && i <= cursor) st = STATES[0]; // fallback to Benign for inactive past windows
+
         return (
           <button
             key={i}
             type="button"
             onClick={() => dispatch({ type: 'seek', position: i + 1 })}
             aria-label={`Window ${i}: ${st ? st.name : 'not yet played'}`}
-            title={st ? `w${i} · ${st.name}` : `w${i}`}
+            title={st ? `w${i} · ${st.name}` : `w${i} · future`}
             className={`h-6 rounded-sm ${i === cursor ? 'ring-2 ring-fg/80 ring-offset-1 ring-offset-surface' : ''}`}
             style={{ backgroundColor: st ? st.color : 'rgb(var(--raised))' }} />);
 
